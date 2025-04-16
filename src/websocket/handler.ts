@@ -5,6 +5,7 @@ import {
   TextContent,
   CursorPos,
   SelectionPos,
+  ExecuteCommand, // Import the new type
 } from "../types/messages";
 import {
   setCursorPosition,
@@ -72,19 +73,29 @@ export class WebSocketHandler {
     this.outputChannel.appendLine(`message ${JSON.stringify(message)}`);
 
     const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-      return;
-    }
+    // Note: ExecuteCommand might not need an active editor
+    // if (!editor && message.type !== "ExecuteCommand") {
+    //   return;
+    // }
 
     switch (message.type) {
       case "TextContent":
-        await this.handleTextContent(message, editor);
+        if (editor) {
+          await this.handleTextContent(message, editor);
+        }
         break;
       case "CursorPos":
-        await this.handleCursorPos(message, editor);
+        if (editor) {
+          await this.handleCursorPos(message, editor);
+        }
         break;
       case "SelectionPos":
-        await this.handleSelectionPos(message, editor);
+        if (editor) {
+          await this.handleSelectionPos(message, editor);
+        }
+        break;
+      case "ExecuteCommand": // Add case for the new type
+        await this.handleExecuteCommand(message);
         break;
     }
   }
@@ -148,6 +159,25 @@ export class WebSocketHandler {
         message.startCol - 1,
         message.endLine - 1,
         message.endCol - 1,
+      );
+    }
+  }
+
+  // Add a new handler method for ExecuteCommand
+  private async handleExecuteCommand(message: ExecuteCommand): Promise<void> {
+    try {
+      this.outputChannel.appendLine(
+        `Executing command: ${message.command} with args: ${JSON.stringify(message.args)}`,
+      );
+      await vscode.commands.executeCommand(message.command, ...(message.args || []));
+      this.outputChannel.appendLine(`Command ${message.command} executed successfully.`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.outputChannel.appendLine(
+        `Error executing command ${message.command}: ${errorMessage}`,
+      );
+      vscode.window.showErrorMessage(
+        `Failed to execute command '${message.command}': ${errorMessage}`,
       );
     }
   }

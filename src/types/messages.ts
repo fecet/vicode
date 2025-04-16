@@ -24,4 +24,10 @@ export type SelectionPos = {
   path: string;
 };
 
-export type Message = TextContent | CursorPos | SelectionPos;
+export type ExecuteCommand = {
+  type: "ExecuteCommand";
+  command: string;
+  args?: unknown[]; // Optional arguments for the command
+};
+
+export type Message = TextContent | CursorPos | SelectionPos | ExecuteCommand;
