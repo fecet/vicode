@@ -4,28 +4,7 @@ if vim.g.loaded_shareedit then
 end
 vim.g.loaded_shareedit = 1
 
-local plugin_name = 'shareedit'
-
-local function is_denops_loaded()
-  -- 检查 denops#plugin#is_loaded 是否存在并可调用
-  if vim.fn['denops#plugin#is_loaded'] == nil then
-    return false
-  end
-  -- 调用 denops#plugin#is_loaded 函数
-  local status, result = pcall(vim.fn['denops#plugin#is_loaded'], plugin_name)
-  return status and result == 1
-end
-
-local function denops_notify(method, params)
-  if not is_denops_loaded() then
-    -- print("ShareEdit: Denops not loaded or plugin not ready.")
-    return
-  end
-  local status, err = pcall(vim.fn['denops#notify'], plugin_name, method, params or {})
-  if not status then
-    print("ShareEdit: Error calling denops#notify for " .. method .. ": " .. err)
-  end
-end
+local denops_notify = require('vicode').denops_notify
 
 -- 同步光标位置
 local function sync_cursor_position()
@@ -76,4 +55,4 @@ vim.api.nvim_create_user_command('ShareEditStop', function()
   denops_notify("stop")
 end, {})
 
-print("ShareEdit Lua plugin loaded")
+print("Vicode Lua plugin loaded")
