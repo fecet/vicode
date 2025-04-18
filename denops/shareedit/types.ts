@@ -22,4 +22,14 @@ export type SelectionPos = {
   endLine: number;
   endCol: number;
   path: string;
-}; 
+};
+
+// Add the new command type
+export type ExecuteCommand = {
+  type: "ExecuteCommand";
+  command: string;
+  args?: unknown[];
+};
+
+// Update the Message union type
+export type Message = TextContent | CursorPos | SelectionPos | ExecuteCommand;

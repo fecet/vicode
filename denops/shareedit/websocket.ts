@@ -1,5 +1,11 @@
 import { Denops } from "jsr:@denops/core@7.0.1/type";
-import type { CursorPos, SelectionPos, TextContent } from "./types.ts";
+import type {
+  CursorPos,
+  SelectionPos,
+  TextContent,
+  ExecuteCommand,
+  Message,
+} from "./types.ts";
 import {
   getCurrentCol,
   getCurrentLine,
@@ -24,8 +30,10 @@ export class WebSocketManager {
     sockets.delete(socket);
   }
 
-  broadcast(data: TextContent | CursorPos | SelectionPos) {
-    sockets.forEach((s) => s.send(JSON.stringify(data)));
+  broadcast(data: Message) {
+    // Ensure sender is always 'vim' when broadcasting from Vim
+    const messageToSend = { ...data, sender: "vim" };
+    sockets.forEach((s) => s.send(JSON.stringify(messageToSend)));
   }
 
   getLastCursorPos() {
@@ -120,9 +128,36 @@ function handleWs(denops: Denops, req: Request): Response {
   };
 
   socket.onmessage = async (_e) => {
-    const msg = JSON.parse(_e.data);
-    if (msg.type === "CursorPos") {
-      await wsManager.handleCursorPosMessage(denops, msg);
+    // Parse message and handle known types
+    try {
+      const msg = JSON.parse(_e.data) as Message; // Use the union type
+      console.log(`ShareEdit: Received message type: ${msg.type}`); // Log received type
+
+      switch (msg.type) {
+        case "CursorPos":
+          // Only handle messages from vscode
+          if (msg.sender === "vscode") {
+            await wsManager.handleCursorPosMessage(denops, msg);
+          }
+          break;
+        // Add cases for other types if needed for logging or specific handling
+        case "TextContent":
+          // Vim currently doesn't process TextContent from VSCode, but log it
+          console.log("ShareEdit: Received TextContent (ignored)");
+          break;
+        case "SelectionPos":
+          // Vim currently doesn't process SelectionPos from VSCode, but log it
+          console.log("ShareEdit: Received SelectionPos (ignored)");
+          break;
+        case "ExecuteCommand":
+          // Vim receives this command but doesn't execute it. Log it.
+          console.log(`ShareEdit: Received ExecuteCommand: ${msg.command} (ignored)`);
+          break;
+        default:
+          console.warn("ShareEdit: Received unknown message type:", msg);
+      }
+    } catch (error) {
+      console.error("ShareEdit: Error processing message:", error, _e.data);
     }
   };
 

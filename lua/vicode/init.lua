@@ -23,4 +23,16 @@ function M.denops_notify(method, params)
   end
 end
 
+-- 新增函数：执行 VS Code 命令
+-- @param command (string) 要执行的 VS Code 命令 ID
+-- @param args (any|table|nil) 命令的参数，可以是单个值或一个包含多个参数的表
+function M.execute_vscode_command(command, args)
+  if type(command) ~= "string" or command == "" then
+    print("ShareEdit Error: command must be a non-empty string.")
+    return
+  end
+  -- 将参数包装在 table 中传递给 denops_notify
+  M.denops_notify("executeVSCodeCommand", { command, args })
+end
+
 return M
