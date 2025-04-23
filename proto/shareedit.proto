@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package shareedit;
+
+// TextContent message for sharing text between vim and vscode
+message TextContentMessage {
+  string sender = 1;  // "vscode" or "vim"
+  string path = 2;    // file path
+  string text = 3;    // file content
+  int32 cursor_line = 4;  // cursor line position
+  int32 cursor_col = 5;   // cursor column position
+}
+
+// CursorPos message for sharing cursor position
+message CursorPosMessage {
+  string sender = 1;  // "vscode" or "vim"
+  string path = 2;    // file path
+  int32 line = 3;     // line position
+  int32 col = 4;      // column position
+}
+
+// SelectionPos message for sharing selection position
+message SelectionPosMessage {
+  int32 start_line = 1;  // selection start line
+  int32 start_col = 2;   // selection start column
+  int32 end_line = 3;    // selection end line
+  int32 end_col = 4;     // selection end column
+  string path = 5;       // file path
+}
+
+// ExecuteCommand message for executing commands
+message ExecuteCommandMessage {
+  string command = 1;    // command to execute
+  repeated string args = 2;  // command arguments
+}
+
+// Empty message for responses that don't need data
+message Empty {}
+
+// Define the service for bidirectional communication
+service ShareEditService {
+  // Methods for vim to send messages to vscode
+  rpc SendTextContent(TextContentMessage) returns (Empty);
+  rpc SendCursorPos(CursorPosMessage) returns (Empty);
+  rpc SendSelectionPos(SelectionPosMessage) returns (Empty);
+  rpc SendExecuteCommand(ExecuteCommandMessage) returns (Empty);
+  
+  // Methods for vscode to send messages to vim
+  rpc ReceiveTextContent(stream TextContentMessage) returns (stream Empty);
+  rpc ReceiveCursorPos(stream CursorPosMessage) returns (stream Empty);
+  rpc ReceiveSelectionPos(stream SelectionPosMessage) returns (stream Empty);
+  rpc ReceiveExecuteCommand(stream ExecuteCommandMessage) returns (stream Empty);
+}
