@@ -1,0 +1,17 @@
+version: v2
+managed:
+  enabled: true
+plugins:
+  - remote: buf.build/bufbuild/es
+    out: gen
+    include_imports: true
+    opt: target=ts
+  - remote: buf.build/bufbuild/es
+    out: denops/gen
+    opt:
+      - target=ts
+      - import_extension=ts
+      - rewrite_imports=@bufbuild/protobuf:npm:@bufbuild/protobuf
+      - rewrite_imports=@bufbuild/protobuf/codegenv1:npm:@bufbuild/protobuf/codegenv1
+inputs:
+  - directory: proto

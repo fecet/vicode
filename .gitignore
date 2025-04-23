@@ -7,3 +7,6 @@ node_modules
 # pixi environments
 .pixi
 *.egg-info
+pixi-pnpm
+gen
+denops/gen
