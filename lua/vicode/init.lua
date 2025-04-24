@@ -1,51 +1,31 @@
 local M = {}
 
 local plugin_name = 'shareedit'
+local is_loaded_cache = nil -- 缓存加载状态
 
 function M.is_denops_loaded()
-  -- 检查 denops#plugin#is_loaded 是否存在并可调用
+  -- 如果已经确认加载成功，直接返回 true
+  if is_loaded_cache == true then
+    return true
+  end
+
+  -- 检查 denops#plugin#is_loaded 函数是否存在
   if vim.fn['denops#plugin#is_loaded'] == nil then
-    -- 检查 denops 是否已安装
-    local has_denops = vim.fn.exists('g:loaded_denops') == 1
-    if not has_denops then
-      -- 只在第一次检查时打印，避免日志过多
-      if not M._denops_check_logged then
-        print("ShareEdit: Denops plugin is not installed or not loaded")
-        M._denops_check_logged = true
-      end
-    else
-      -- 检查 denops 服务器状态
-      if vim.fn.exists('*denops#server#status') == 1 then
-        local server_status = vim.fn['denops#server#status']()
-        if not M._denops_status_logged or M._last_denops_status ~= server_status then
-          print("ShareEdit: Denops server status: " .. server_status)
-          M._denops_status_logged = true
-          M._last_denops_status = server_status
-        end
-      end
-    end
+    -- Denops 或其核心函数不可用
     return false
   end
 
-  -- 调用 denops#plugin#is_loaded 函数
+  -- 调用 denops#plugin#is_loaded 函数检查插件状态
   local status, result = pcall(vim.fn['denops#plugin#is_loaded'], plugin_name)
 
-  -- 记录结果（但避免重复日志）
-  if not M._plugin_load_status_logged or M._last_plugin_load_status ~= (status and result == 1) then
-    if status then
-      if result == 1 then
-        print("ShareEdit: Plugin '" .. plugin_name .. "' is loaded")
-      else
-        print("ShareEdit: Plugin '" .. plugin_name .. "' is not loaded yet")
-      end
-    else
-      print("ShareEdit: Error checking plugin load status: " .. tostring(result))
-    end
-    M._plugin_load_status_logged = true
-    M._last_plugin_load_status = (status and result == 1)
+  -- 如果调用成功且插件已加载 (result == 1)
+  if status and result == 1 then
+    is_loaded_cache = true -- 缓存结果
+    return true
   end
 
-  return status and result == 1
+  -- 其他情况（调用失败或插件未加载）
+  return false
 end
 
 function M.denops_notify(method, params)
