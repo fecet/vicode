@@ -4,18 +4,18 @@ import { runWsServer, stopWsServer, WebSocketManager } from "./websocket.ts";
 import {
   ensureNumber,
   ensureString,
-  // ensureArray, // Add if needed, or handle unknown[] directly
   getCurrentCol,
   getCurrentLine,
   getCurrentPath,
   getCurrentText,
 } from "./utils.ts";
-// Import the new type
+// 导入适配层类型
 import type {
   CursorPos,
   SelectionPos,
   TextContent,
   ExecuteCommand,
+  Message,
 } from "./types.ts";
 
 const wsManager = new WebSocketManager();
@@ -26,6 +26,8 @@ export function main(denops: Denops): Promise<void> {
       const lineNum = ensureNumber(line);
       const colNum = ensureNumber(col);
       const path = ensureString(await denops.call("expand", "%:p"));
+
+      // 创建光标位置消息
       const json: CursorPos = {
         type: "CursorPos",
         sender: "vim",
@@ -35,7 +37,7 @@ export function main(denops: Denops): Promise<void> {
       };
       wsManager.broadcast(json);
     },
-    50,
+    50, // 防抖时间保持不变
   );
 
   denops.dispatcher = {
@@ -43,6 +45,8 @@ export function main(denops: Denops): Promise<void> {
       const currentBuffer = await getCurrentPath(denops);
       const line = await getCurrentLine(denops);
       const col = await getCurrentCol(denops);
+
+      // 创建文本内容消息
       const body: TextContent = {
         type: "TextContent",
         sender: "vim",
@@ -85,9 +89,9 @@ export function main(denops: Denops): Promise<void> {
       endLine: unknown,
       endCol: unknown,
     ): Promise<void> {
+      // 创建选择位置消息
       const json: SelectionPos = {
         type: "SelectionPos",
-        // sender: "vim", // Sender is added in broadcast
         startLine: ensureNumber(startLine),
         startCol: ensureNumber(startCol),
         endLine: ensureNumber(endLine),
@@ -98,26 +102,32 @@ export function main(denops: Denops): Promise<void> {
       return Promise.resolve();
     },
 
-    // Add the new dispatcher method
+    // 执行 VSCode 命令的方法
     async executeVSCodeCommand(
       command: unknown,
       args?: unknown,
     ): Promise<void> {
       const commandStr = ensureString(command);
-      // Ensure args is an array if provided, otherwise undefined
-      const commandArgs = args === undefined || args === null
-        ? undefined
-        : Array.isArray(args)
-        ? args
-        : [args]; // Wrap single non-array arg in an array
+      // 确保参数是字符串数组，符合 protobuf 类型要求
+      let commandArgs: string[] = [];
+
+      if (args !== undefined && args !== null) {
+        if (Array.isArray(args)) {
+          // 确保数组中的所有元素都是字符串
+          commandArgs = args.map(arg => String(arg));
+        } else {
+          // 将单个非数组参数包装为字符串数组
+          commandArgs = [String(args)];
+        }
+      }
 
       console.log(
         `ShareEdit: Sending command '${commandStr}' with args: ${JSON.stringify(commandArgs)}`,
       );
 
+      // 使用 toExecuteCommand 函数创建消息
       const json: ExecuteCommand = {
         type: "ExecuteCommand",
-        // sender: "vim", // Sender is added in broadcast
         command: commandStr,
         args: commandArgs,
       };

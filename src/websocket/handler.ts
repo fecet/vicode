@@ -163,13 +163,17 @@ export class WebSocketHandler {
     }
   }
 
-  // Add a new handler method for ExecuteCommand
+  // 处理 ExecuteCommand 消息的方法
   private async handleExecuteCommand(message: ExecuteCommand): Promise<void> {
     try {
       this.outputChannel.appendLine(
         `Executing command: ${message.command} with args: ${JSON.stringify(message.args)}`,
       );
-      await vscode.commands.executeCommand(message.command, ...(message.args || []));
+
+      // 确保 args 是数组，并将其传递给 executeCommand
+      const args = Array.isArray(message.args) ? message.args : [];
+      await vscode.commands.executeCommand(message.command, ...args);
+
       this.outputChannel.appendLine(`Command ${message.command} executed successfully.`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

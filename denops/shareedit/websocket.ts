@@ -1,9 +1,7 @@
 import { Denops } from "jsr:@denops/core@7.0.1/type";
+// 导入适配层类型
 import type {
   CursorPos,
-  SelectionPos,
-  TextContent,
-  ExecuteCommand,
   Message,
 } from "./types.ts";
 import {
@@ -14,6 +12,15 @@ import {
   getSpecificLineLength,
 } from "./utils.ts";
 import { cleanupSessions, saveSession } from "./session.ts";
+
+// 声明 Deno 命名空间，以便 TypeScript 编译器识别
+declare namespace Deno {
+  function upgradeWebSocket(req: Request): { socket: WebSocket; response: Response };
+  function serve(options: { port: number }, handler: (req: Request) => Response): {
+    addr: { port: number };
+    shutdown(): Promise<void>;
+  };
+}
 
 // private field in WebSocketManager is not working
 const sockets = new Set<WebSocket>();
@@ -94,7 +101,13 @@ export class WebSocketManager {
   }
 }
 
-let currentServer: Deno.HttpServer<Deno.NetAddr> | null = null;
+// 定义 Deno 服务器类型
+type DenoHttpServer = {
+  addr: { port: number };
+  shutdown(): Promise<void>;
+};
+
+let currentServer: DenoHttpServer | null = null;
 
 export async function stopWsServer() {
   if (!currentServer) {
@@ -110,12 +123,22 @@ export async function stopWsServer() {
 const wsManager = new WebSocketManager();
 console.log("initialize wsmanager");
 
-function handleWs(denops: Denops, req: Request): Response {
+// 定义请求和响应类型
+type WebSocketRequest = {
+  headers: {
+    get(name: string): string | null;
+  };
+};
+
+type WebSocketResponse = Response;
+
+function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
   if (req.headers.get("upgrade") !== "websocket") {
     return new Response("not trying to upgrade as websocket.");
   }
 
-  const { socket, response } = Deno.upgradeWebSocket(req);
+  // 使用 Deno 的 upgradeWebSocket 函数
+  const { socket, response } = Deno.upgradeWebSocket(req as Request);
   wsManager.addSocket(socket);
 
   socket.onopen = () => {
@@ -127,57 +150,58 @@ function handleWs(denops: Denops, req: Request): Response {
     wsManager.removeSocket(socket);
   };
 
-  socket.onmessage = async (_e) => {
-    // Parse message and handle known types
+  socket.onmessage = async (e: MessageEvent) => {
+    // 解析消息并处理已知类型
     try {
-      const msg = JSON.parse(_e.data) as Message; // Use the union type
-      console.log(`ShareEdit: Received message type: ${msg.type}`); // Log received type
+      const msg = JSON.parse(e.data as string) as Message; // 使用联合类型
+      console.log(`ShareEdit: Received message type: ${msg.type}`); // 记录接收到的类型
 
       switch (msg.type) {
         case "CursorPos":
-          // Only handle messages from vscode
+          // 只处理来自 vscode 的消息
           if (msg.sender === "vscode") {
             await wsManager.handleCursorPosMessage(denops, msg);
           }
           break;
-        // Add cases for other types if needed for logging or specific handling
+        // 添加其他类型的处理逻辑（如果需要）
         case "TextContent":
-          // Vim currently doesn't process TextContent from VSCode, but log it
+          // Vim 当前不处理来自 VSCode 的 TextContent，但记录它
           console.log("ShareEdit: Received TextContent (ignored)");
           break;
         case "SelectionPos":
-          // Vim currently doesn't process SelectionPos from VSCode, but log it
+          // Vim 当前不处理来自 VSCode 的 SelectionPos，但记录它
           console.log("ShareEdit: Received SelectionPos (ignored)");
           break;
         case "ExecuteCommand":
-          // Vim receives this command but doesn't execute it. Log it.
+          // Vim 接收此命令但不执行它。记录它。
           console.log(`ShareEdit: Received ExecuteCommand: ${msg.command} (ignored)`);
           break;
         default:
           console.warn("ShareEdit: Received unknown message type:", msg);
       }
     } catch (error) {
-      console.error("ShareEdit: Error processing message:", error, _e.data);
+      console.error("ShareEdit: Error processing message:", error, e.data);
     }
   };
 
-  socket.onerror = (e) => console.error("ShareEdit error:", e);
+  socket.onerror = (e: Event) => console.error("ShareEdit error:", e);
   return response;
 }
 
 export async function runWsServer(denops: Denops) {
-  // Close existing server if it exists
+  // 关闭现有服务器（如果存在）
   if (currentServer) {
     console.log("ShareEdit: Closing existing server");
     await currentServer.shutdown();
     currentServer = null;
   }
 
-  // Clean up stale sessions before starting new server
+  // 在启动新服务器之前清理过期会话
   await cleanupSessions();
 
-  const server = Deno.serve({ port: 0 }, (req) => handleWs(denops, req));
-  currentServer = server;
+  // 使用 Deno.serve 启动服务器
+  const server = Deno.serve({ port: 0 }, (req: Request) => handleWs(denops, req));
+  currentServer = server as unknown as DenoHttpServer;
   const port = server.addr.port;
 
   // Save session information

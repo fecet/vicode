@@ -11,27 +11,30 @@ import {
 let wsHandler: WebSocketHandler;
 let outputChannel: vscode.OutputChannel;
 
-// Create a debounced version of the cursor position sender
+// 创建光标位置发送器的防抖版本
 const debouncedSendCursorPos = debounce(
   (
     document: vscode.TextDocument,
     cursorPosition: ReturnType<typeof getCursorPosition>,
   ) => {
+    // 如果位置没有变化，则不发送
     if (
       lastCursorPosition &&
       lastCursorPosition.path === cursorPosition.path &&
       lastCursorPosition.line === cursorPosition.line &&
       lastCursorPosition.col === cursorPosition.col
     ) {
-      return; // Do not send if the position hasn't changed
+      return;
     }
 
+    // 更新最后的光标位置
     updateLastCursorPosition(
       cursorPosition.path,
       cursorPosition.line,
       cursorPosition.col,
     );
 
+    // 创建符合 protobuf 类型的消息
     const cursorPos: CursorPos = {
       type: "CursorPos",
       sender: "vscode",
@@ -41,7 +44,7 @@ const debouncedSendCursorPos = debounce(
     };
     wsHandler.sendMessage(cursorPos);
   },
-  50,
+  50, // 防抖时间保持不变
 );
 
 export function activate(context: vscode.ExtensionContext) {
@@ -72,7 +75,7 @@ export function activate(context: vscode.ExtensionContext) {
       const cursorPosition = getCursorPosition();
       debouncedSendCursorPos(document, cursorPosition);
     } else {
-      // TODO
+      // 创建选择位置消息
       const selectionPos: SelectionPos = {
         type: "SelectionPos",
         startCol: selection.start.character,
