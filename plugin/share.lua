@@ -1,21 +1,18 @@
--- 防止重复加载
 if vim.g.loaded_shareedit then
   return
 end
 vim.g.loaded_shareedit = 1
 
 local denops_notify = require('vicode').denops_notify
+local augroup_name = 'ShareEdit' -- Define augroup name globally
 
--- 同步光标位置
 local function sync_cursor_position()
   local current_mode = vim.fn.mode()
-  -- 在非可视模式和插入模式之外同步
   if current_mode ~= 'v' and current_mode ~= 'V' and current_mode ~= 'i' and current_mode ~= 'I' then
     denops_notify("syncCursorPos")
   end
 end
 
--- 同步可视模式选择
 local function sync_visual_selection()
   local current_mode = vim.fn.mode()
   if current_mode == 'v' or current_mode == 'V' then
@@ -25,25 +22,27 @@ local function sync_visual_selection()
   end
 end
 
--- 创建自动命令组
-local augroup = vim.api.nvim_create_augroup('ShareEdit', { clear = true })
-
--- 设置自动命令
-vim.api.nvim_create_autocmd({ "CursorMoved", "VimResized" }, {
-  group = augroup,
-  pattern = "*",
-  callback = sync_visual_selection
-})
-
-vim.api.nvim_create_autocmd({ "CursorMoved", "CursorHold", "InsertLeave" }, {
-  group = augroup,
-  pattern = "*",
-  callback = sync_cursor_position
-})
-
--- 创建用户命令
 vim.api.nvim_create_user_command('ShareEditStart', function()
-  print("ShareEdit: Starting WebSocket server...")
+  print("ShareEdit: Starting WebSocket server and registering autocommands...")
+  -- Create augroup and register autocommands here
+  vim.api.nvim_create_augroup(augroup_name, { clear = true })
+  vim.api.nvim_create_autocmd({ "CursorMoved", "VimResized" }, {
+    group = augroup_name,
+    pattern = "*",
+    callback = sync_visual_selection
+  })
+  vim.api.nvim_create_autocmd({ "CursorMoved", "CursorHold", "InsertLeave" }, {
+    group = augroup_name,
+    pattern = "*",
+    callback = sync_cursor_position
+  })
+  -- Also add TextChanged if needed later
+  -- vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+  --   group = augroup_name,
+  --   pattern = "*",
+  --   callback = function() denops_notify("syncText") end
+  -- })
+
   local vicode = require('vicode')
   vicode.wait_for_denops_and_notify(
     "start",
@@ -53,13 +52,16 @@ vim.api.nvim_create_user_command('ShareEditStart', function()
 end, {})
 
 vim.api.nvim_create_user_command('ShareEditStop', function()
-  print("ShareEdit: Stopping WebSocket server...")
+  print("ShareEdit: Stopping WebSocket server and removing autocommands...")
   local vicode = require('vicode')
   vicode.wait_for_denops_and_notify(
     "stop",
     5, -- max_attempts
     300 -- attempt_interval (ms)
   )
+  -- Remove autocommands here
+  vim.api.nvim_clear_autocmds({ group = augroup_name })
+  print("ShareEdit: Autocommands removed.")
 end, {})
 
 print("Vicode Lua plugin loaded")
