@@ -11,7 +11,7 @@ import {
   getLastLine,
   getSpecificLineLength,
 } from "./utils.ts";
-import { cleanupSessions, saveSession } from "./session.ts";
+import { cleanupSessions, saveSession, getConfigDir } from "./session.ts";
 
 // 声明 Deno 命名空间，以便 TypeScript 编译器识别
 declare namespace Deno {
@@ -189,6 +189,8 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
 }
 
 export async function runWsServer(denops: Denops) {
+  console.log("ShareEdit: Starting WebSocket server...");
+
   // 关闭现有服务器（如果存在）
   if (currentServer) {
     console.log("ShareEdit: Closing existing server");
@@ -196,14 +198,32 @@ export async function runWsServer(denops: Denops) {
     currentServer = null;
   }
 
-  // 在启动新服务器之前清理过期会话
-  await cleanupSessions();
+  try {
+    // 在启动新服务器之前清理过期会话
+    console.log("ShareEdit: Cleaning up expired sessions...");
+    await cleanupSessions();
 
-  // 使用 Deno.serve 启动服务器
-  const server = Deno.serve({ port: 0 }, (req: Request) => handleWs(denops, req));
-  currentServer = server as unknown as DenoHttpServer;
-  const port = server.addr.port;
+    // 使用 Deno.serve 启动服务器
+    console.log("ShareEdit: Creating new WebSocket server...");
+    const server = Deno.serve({ port: 0 }, (req: Request) => handleWs(denops, req));
+    currentServer = server as unknown as DenoHttpServer;
+    const port = server.addr.port;
+    console.log(`ShareEdit: Server started on port ${port}`);
 
-  // Save session information
-  await saveSession(port);
+    // Save session information
+    console.log("ShareEdit: Saving session information...");
+    try {
+      const configDir = getConfigDir();
+      console.log(`ShareEdit: Using config directory: ${configDir}`);
+      await saveSession(port);
+      console.log("ShareEdit: Session information saved successfully");
+    } catch (error) {
+      console.error("ShareEdit: Failed to save session information:", error);
+    }
+
+    return port;
+  } catch (error) {
+    console.error("ShareEdit: Error starting WebSocket server:", error);
+    throw error;
+  }
 }

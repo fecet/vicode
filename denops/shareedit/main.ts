@@ -136,7 +136,27 @@ export function main(denops: Denops): Promise<void> {
     },
 
     async start() {
-      await runWsServer(denops);
+      console.log("ShareEdit: start method called in dispatcher");
+      try {
+        // 添加超时处理
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error("ShareEdit: WebSocket server start timed out"));
+          }, 10000); // 10秒超时
+        });
+
+        // 竞争条件：哪个先完成就返回哪个结果
+        const port = await Promise.race([
+          runWsServer(denops),
+          timeoutPromise
+        ]);
+
+        console.log(`ShareEdit: WebSocket server started successfully on port ${port}`);
+        return { success: true, port };
+      } catch (error) {
+        console.error("ShareEdit: Failed to start WebSocket server:", error);
+        return { success: false, error: String(error) };
+      }
     },
 
     async stop() {

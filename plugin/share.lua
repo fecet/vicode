@@ -48,11 +48,93 @@ vim.api.nvim_create_autocmd({ "CursorMoved", "CursorHold", "InsertLeave" }, {
 
 -- 创建用户命令
 vim.api.nvim_create_user_command('ShareEditStart', function()
-  denops_notify("start")
+  print("ShareEdit: Starting WebSocket server...")
+
+  -- 获取vicode模块
+  local vicode = require('vicode')
+
+  -- 定义最大尝试次数和间隔
+  local max_attempts = 10
+  local attempt_interval = 500 -- 毫秒
+  local current_attempt = 0
+
+  -- 创建一个递归函数来等待Denops加载
+  local function wait_for_denops_and_start()
+    current_attempt = current_attempt + 1
+
+    -- 检查Denops是否已加载
+    if vicode.is_denops_loaded() then
+      print("ShareEdit: Denops is loaded, starting server...")
+
+      -- 尝试启动服务器
+      local success = denops_notify("start")
+      if success then
+        print("ShareEdit: Server start request sent successfully")
+        -- 延迟一段时间后检查服务器状态
+        vim.defer_fn(function()
+          print("ShareEdit: Checking server status...")
+          -- 这里可以添加检查逻辑，例如检查配置文件是否已创建
+        end, 2000) -- 2秒后检查
+      else
+        print("ShareEdit: Failed to send server start request")
+      end
+    else
+      -- 如果还没加载完成且未超过最大尝试次数，继续等待
+      if current_attempt < max_attempts then
+        print(string.format("ShareEdit: Waiting for Denops to load... (attempt %d/%d)",
+                           current_attempt, max_attempts))
+        vim.defer_fn(wait_for_denops_and_start, attempt_interval)
+      else
+        print("ShareEdit: Timed out waiting for Denops to load. Please try again later.")
+        print("ShareEdit: You can check Denops status with :checkhealth denops")
+      end
+    end
+  end
+
+  -- 开始等待过程
+  wait_for_denops_and_start()
 end, {})
 
 vim.api.nvim_create_user_command('ShareEditStop', function()
-  denops_notify("stop")
+  print("ShareEdit: Stopping WebSocket server...")
+
+  -- 获取vicode模块
+  local vicode = require('vicode')
+
+  -- 定义最大尝试次数和间隔
+  local max_attempts = 5
+  local attempt_interval = 300 -- 毫秒
+  local current_attempt = 0
+
+  -- 创建一个递归函数来等待Denops加载
+  local function wait_for_denops_and_stop()
+    current_attempt = current_attempt + 1
+
+    -- 检查Denops是否已加载
+    if vicode.is_denops_loaded() then
+      print("ShareEdit: Denops is loaded, stopping server...")
+
+      -- 尝试停止服务器
+      local success = denops_notify("stop")
+      if success then
+        print("ShareEdit: Server stop request sent successfully")
+      else
+        print("ShareEdit: Failed to send server stop request")
+      end
+    else
+      -- 如果还没加载完成且未超过最大尝试次数，继续等待
+      if current_attempt < max_attempts then
+        print(string.format("ShareEdit: Waiting for Denops to load... (attempt %d/%d)",
+                           current_attempt, max_attempts))
+        vim.defer_fn(wait_for_denops_and_stop, attempt_interval)
+      else
+        print("ShareEdit: Timed out waiting for Denops to load. Please try again later.")
+      end
+    end
+  end
+
+  -- 开始等待过程
+  wait_for_denops_and_stop()
 end, {})
 
 print("Vicode Lua plugin loaded")
