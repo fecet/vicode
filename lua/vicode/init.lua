@@ -29,10 +29,7 @@ function M.is_denops_loaded()
 end
 
 function M.denops_notify(method, params)
-  if not M.is_denops_loaded() then
-    print("ShareEdit: Denops not loaded or plugin not ready. Cannot execute: " .. method)
-    return false
-  end
+  
 
   print("ShareEdit: Calling denops#notify for method: " .. method)
   local status, err = pcall(vim.fn['denops#notify'], plugin_name, method, params or {})
