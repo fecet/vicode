@@ -58,4 +58,31 @@ function M.execute_vscode_command(command, args)
   M.denops_notify("executeVSCodeCommand", { command, args })
 end
 
+-- 新增函数：带重试逻辑地调用 Denops notify
+function M.wait_for_denops_and_notify(method, max_attempts, attempt_interval)
+  local current_attempt = 0
+
+  local function wait_and_notify()
+    current_attempt = current_attempt + 1
+
+    if M.is_denops_loaded() then
+      print("ShareEdit: Denops is loaded, calling method: " .. method)
+      M.denops_notify(method)
+      -- 不需要打印成功或失败消息
+    else
+      if current_attempt < max_attempts then
+        vim.notify(string.format("ShareEdit: Waiting for Denops to load... (attempt %d/%d)",
+                           current_attempt, max_attempts), vim.log.levels.DEBUG)
+        vim.defer_fn(wait_and_notify, attempt_interval)
+      else
+        vim.notify("ShareEdit: Timed out waiting for Denops to load. Please try again later.", vim.log.levels.WARN)
+        vim.notify("ShareEdit: You can check Denops status with :checkhealth denops", vim.log.levels.INFO)
+      end
+    end
+  end
+
+  -- 开始等待过程
+  wait_and_notify()
+end
+
 return M
