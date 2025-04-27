@@ -8,4 +8,10 @@ vsc-extension-quickstart.md
 **/eslint.config.mjs
 **/*.map
 **/*.ts
+**/*.lua
+**/*.proto
 **/.vscode-test.*
+.pixi/**
+pixi*
+buf*
+.envrc

@@ -1,12 +1,12 @@
 {
-  "name": "shareedit",
+  "name": "vicode",
   "displayName": "Share Edit",
   "description": "Collaborative editing with Vim",
   "version": "0.0.11",
-  "publisher": "kbwo",
+  "publisher": "fecet",
   "repository": {
     "type": "git",
-    "url": "https://github.com/kbwo/vscode-shareedit"
+    "url": "https://github.com/fecet/vicode"
   },
   "engines": {
     "vscode": "^1.90.0"
@@ -15,7 +15,7 @@
     "Other"
   ],
   "activationEvents": [],
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
@@ -29,9 +29,11 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "pnpm run bundle",
+    "compile": "tsc -p ./ --noEmit",
+    "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "bundle": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --minify",
+    "package": "pnpm run bundle && vsce package --no-dependencies -o vicode.vsix",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint -c eslint.config.mjs",
     "lint:fix": "eslint -c eslint.config.mjs --fix",
@@ -48,20 +50,22 @@
     "@typescript-eslint/parser": "^8.19.1",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "esbuild": "^0.23.1",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "prettier": "^3.4.2",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vsce": "^2.15.0"
   },
   "dependencies": {
-    "debounce": "^2.2.0",
-    "ws": "^8.18.0",
     "@bufbuild/protobuf": "^2.2.5",
     "@connectrpc/connect": "^2.0.2",
     "@connectrpc/connect-fastify": "^2.0.2",
     "@connectrpc/connect-node": "^2.0.2",
     "@connectrpc/connect-web": "^2.0.2",
-    "fastify": "^5.3.2"
+    "debounce": "^2.2.0",
+    "fastify": "^5.3.2",
+    "ws": "^8.18.0"
   }
 }
