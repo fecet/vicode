@@ -92,15 +92,4 @@ vim.api.nvim_create_user_command("VicodeStop", function()
 	vicode.server.address = nil
 end, {})
 
--- 为了向后兼容，保留旧命令但重定向到新命令
-vim.api.nvim_create_user_command("ShareEditStart", function()
-	vim.notify("ShareEdit has been renamed to Vicode. Please use :VicodeStart instead.", vim.log.levels.WARN)
-	vim.cmd("VicodeStart")
-end, {})
-
-vim.api.nvim_create_user_command("ShareEditStop", function()
-	vim.notify("ShareEdit has been renamed to Vicode. Please use :VicodeStop instead.", vim.log.levels.WARN)
-	vim.cmd("VicodeStop")
-end, {})
-
 print("Vicode Lua plugin loaded")
