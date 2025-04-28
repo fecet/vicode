@@ -165,12 +165,10 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
           break;
         // 添加其他类型的处理逻辑（如果需要）
         case "TextContent":
-          // Vim 当前不处理来自 VSCode 的 TextContent，但记录它
-          console.log("ShareEdit: Received TextContent (ignored)");
+          // Vim 当前不处理来自 VSCode 的 TextContent
           break;
         case "SelectionPos":
-          // Vim 当前不处理来自 VSCode 的 SelectionPos，但记录它
-          console.log("ShareEdit: Received SelectionPos (ignored)");
+          // Vim 当前不处理来自 VSCode 的 SelectionPos
           break;
         case "ExecuteCommand":
           // Vim 接收此命令但不执行它。记录它。
