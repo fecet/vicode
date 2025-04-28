@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package shareedit;
+package vicode;
 
 // TextContent message for sharing text between vim and vscode
 message TextContentMessage {
@@ -38,7 +38,7 @@ message ExecuteCommandMessage {
 message Empty {}
 
 // Define the service for bidirectional communication
-service ShareEditService {
+service ViCodeService {
   // Methods for vim to send messages to vscode
   rpc SendTextContent(TextContentMessage) returns (Empty);
   rpc SendCursorPos(CursorPosMessage) returns (Empty);

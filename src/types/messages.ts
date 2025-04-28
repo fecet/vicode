@@ -1,11 +1,10 @@
 // 导入 protobuf 生成的类型
-// 注意：我们仍然使用 shareedit_pb 因为 gen 文件夹不需要修改
 import type {
   TextContentMessage,
   CursorPosMessage,
   SelectionPosMessage,
   ExecuteCommandMessage,
-} from "../../gen/shareedit_pb";
+} from "../../gen/vicode_pb";
 
 // 定义适配层类型，使用接口而不是交叉类型
 export interface TextContent {

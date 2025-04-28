@@ -4,7 +4,7 @@ import type {
   CursorPosMessage,
   SelectionPosMessage,
   ExecuteCommandMessage,
-} from "../gen/shareedit_pb.ts";
+} from "../gen/vicode_pb.ts";
 
 // 定义适配层类型，使用接口而不是交叉类型
 export interface TextContent {
