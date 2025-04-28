@@ -1,6 +1,11 @@
 import * as vscode from "vscode";
 import { WebSocketHandler } from "./websocket/handler";
-import { CursorPos, SelectionPos } from "./types/messages";
+import {
+  CursorPosMessage,
+  SelectionPosMessage,
+  TextContentMessage,
+  ExecuteCommandMessage
+} from "../gen/vicode_pb";
 import { getCursorPosition, isFocused } from "./utils/editor";
 import debounce from "debounce";
 import {
@@ -35,8 +40,7 @@ const debouncedSendCursorPos = debounce(
     );
 
     // 创建符合 protobuf 类型的消息
-    const cursorPos: CursorPos = {
-      type: "CursorPos",
+    const cursorPos: CursorPosMessage = {
       sender: "vscode",
       path: document.uri.fsPath,
       line: cursorPosition.line,
@@ -87,8 +91,7 @@ export function activate(context: vscode.ExtensionContext) {
       debouncedSendCursorPos(document, cursorPosition);
     } else {
       // 创建选择位置消息
-      const selectionPos: SelectionPos = {
-        type: "SelectionPos",
+      const selectionPos: SelectionPosMessage = {
         startCol: selection.start.character,
         startLine: selection.start.line,
         endCol: selection.end.character,

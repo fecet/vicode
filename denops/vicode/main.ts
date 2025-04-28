@@ -9,14 +9,20 @@ import {
   getCurrentPath,
   getCurrentText,
 } from "./utils.ts";
-// 导入适配层类型
+// 导入 protobuf 生成的类型
 import type {
-  CursorPos,
-  SelectionPos,
-  TextContent,
-  ExecuteCommand,
-  Message,
-} from "./types.ts";
+  TextContentMessage,
+  CursorPosMessage,
+  SelectionPosMessage,
+  ExecuteCommandMessage,
+} from "../gen/vicode_pb.ts";
+
+// Define a type for messages with a type field for JSON serialization
+type MessageWithType =
+  | (TextContentMessage & { type: "TextContent" })
+  | (CursorPosMessage & { type: "CursorPos" })
+  | (SelectionPosMessage & { type: "SelectionPos" })
+  | (ExecuteCommandMessage & { type: "ExecuteCommand" });
 
 const wsManager = new WebSocketManager();
 
@@ -28,7 +34,7 @@ export function main(denops: Denops): Promise<void> {
       const path = ensureString(await denops.call("expand", "%:p"));
 
       // 创建光标位置消息
-      const json: CursorPos = {
+      const json: CursorPosMessage & { type: "CursorPos" } = {
         type: "CursorPos",
         sender: "vim",
         path,
@@ -47,7 +53,7 @@ export function main(denops: Denops): Promise<void> {
       const col = await getCurrentCol(denops);
 
       // 创建文本内容消息
-      const body: TextContent = {
+      const body: TextContentMessage & { type: "TextContent" } = {
         type: "TextContent",
         sender: "vim",
         path: currentBuffer,
@@ -90,7 +96,7 @@ export function main(denops: Denops): Promise<void> {
       endCol: unknown,
     ): Promise<void> {
       // 创建选择位置消息
-      const json: SelectionPos = {
+      const json: SelectionPosMessage & { type: "SelectionPos" } = {
         type: "SelectionPos",
         startLine: ensureNumber(startLine),
         startCol: ensureNumber(startCol),
@@ -125,8 +131,8 @@ export function main(denops: Denops): Promise<void> {
         `Vicode: Sending command '${commandStr}' with args: ${JSON.stringify(commandArgs)}`,
       );
 
-      // 使用 toExecuteCommand 函数创建消息
-      const json: ExecuteCommand = {
+      // 创建命令执行消息
+      const json: ExecuteCommandMessage & { type: "ExecuteCommand" } = {
         type: "ExecuteCommand",
         command: commandStr,
         args: commandArgs,

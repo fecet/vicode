@@ -1,12 +1,11 @@
 import * as vscode from "vscode";
 import { WebSocket, MessageEvent } from "ws";
 import {
-  Message,
-  TextContent,
-  CursorPos,
-  SelectionPos,
-  ExecuteCommand, // Import the new type
-} from "../types/messages";
+  TextContentMessage,
+  CursorPosMessage,
+  SelectionPosMessage,
+  ExecuteCommandMessage
+} from "../../gen/vicode_pb";
 import {
   setCursorPosition,
   selectRange,
@@ -18,6 +17,13 @@ import {
   updateLastCursorPosition,
 } from "../utils/sharedState";
 import { showSessionSelector } from "./session";
+
+// Define a type for messages with a type field for JSON serialization
+type MessageWithType =
+  | (TextContentMessage & { type: "TextContent" })
+  | (CursorPosMessage & { type: "CursorPos" })
+  | (SelectionPosMessage & { type: "SelectionPos" })
+  | (ExecuteCommandMessage & { type: "ExecuteCommand" });
 
 export class WebSocketHandler {
   private socket: WebSocket | null = null;
@@ -121,39 +127,36 @@ export class WebSocketHandler {
   }
 
   private async handleMessage(ev: MessageEvent): Promise<void> {
-    const message = JSON.parse(ev.data.toString()) as Message;
+    const message = JSON.parse(ev.data.toString()) as MessageWithType;
     this.outputChannel.appendLine(`message ${JSON.stringify(message)}`);
 
     const editor = vscode.window.activeTextEditor;
     // Note: ExecuteCommand might not need an active editor
-    // if (!editor && message.type !== "ExecuteCommand") {
-    //   return;
-    // }
 
     switch (message.type) {
       case "TextContent":
         if (editor) {
-          await this.handleTextContent(message, editor);
+          await this.handleTextContent(message as TextContentMessage & { type: "TextContent" }, editor);
         }
         break;
       case "CursorPos":
         if (editor) {
-          await this.handleCursorPos(message, editor);
+          await this.handleCursorPos(message as CursorPosMessage & { type: "CursorPos" }, editor);
         }
         break;
       case "SelectionPos":
         if (editor) {
-          await this.handleSelectionPos(message, editor);
+          await this.handleSelectionPos(message as SelectionPosMessage & { type: "SelectionPos" }, editor);
         }
         break;
-      case "ExecuteCommand": // Add case for the new type
-        await this.handleExecuteCommand(message);
+      case "ExecuteCommand":
+        await this.handleExecuteCommand(message as ExecuteCommandMessage & { type: "ExecuteCommand" });
         break;
     }
   }
 
   private async handleTextContent(
-    message: TextContent,
+    message: TextContentMessage & { type: "TextContent" },
     editor: vscode.TextEditor,
   ): Promise<void> {
     if (message.path === editor.document.uri.fsPath) {
@@ -163,7 +166,7 @@ export class WebSocketHandler {
   }
 
   private async handleCursorPos(
-    message: CursorPos,
+    message: CursorPosMessage & { type: "CursorPos" },
     editor: vscode.TextEditor,
   ): Promise<void> {
     this.outputChannel.appendLine(
@@ -202,7 +205,7 @@ export class WebSocketHandler {
   }
 
   private async handleSelectionPos(
-    message: SelectionPos,
+    message: SelectionPosMessage & { type: "SelectionPos" },
     editor: vscode.TextEditor,
   ): Promise<void> {
     if (message.path === editor.document.uri.fsPath) {
@@ -216,7 +219,7 @@ export class WebSocketHandler {
   }
 
   // 处理 ExecuteCommand 消息的方法
-  private async handleExecuteCommand(message: ExecuteCommand): Promise<void> {
+  private async handleExecuteCommand(message: ExecuteCommandMessage & { type: "ExecuteCommand" }): Promise<void> {
     try {
       this.outputChannel.appendLine(
         `Executing command: ${message.command} with args: ${JSON.stringify(message.args)}`,
@@ -238,7 +241,7 @@ export class WebSocketHandler {
     }
   }
 
-  public sendMessage(message: Message): void {
+  public sendMessage(message: MessageWithType): void {
     if (!this.socket) {
       return;
     }

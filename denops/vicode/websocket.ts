@@ -1,9 +1,11 @@
 import { Denops } from "jsr:@denops/core@7.0.1/type";
-// 导入适配层类型
+// 导入 protobuf 生成的类型
 import type {
-  CursorPos,
-  Message,
-} from "./types.ts";
+  TextContentMessage,
+  CursorPosMessage,
+  SelectionPosMessage,
+  ExecuteCommandMessage,
+} from "../gen/vicode_pb.ts";
 import {
   getCurrentCol,
   getCurrentLine,
@@ -12,6 +14,13 @@ import {
   getSpecificLineLength,
 } from "./utils.ts";
 import { cleanupSessions, saveSession, getConfigDir } from "./session.ts";
+
+// Define a type for messages with a type field for JSON serialization
+type MessageWithType =
+  | (TextContentMessage & { type: "TextContent" })
+  | (CursorPosMessage & { type: "CursorPos" })
+  | (SelectionPosMessage & { type: "SelectionPos" })
+  | (ExecuteCommandMessage & { type: "ExecuteCommand" });
 
 // 声明 Deno 命名空间，以便 TypeScript 编译器识别
 declare namespace Deno {
@@ -37,7 +46,7 @@ export class WebSocketManager {
     sockets.delete(socket);
   }
 
-  broadcast(data: Message) {
+  broadcast(data: MessageWithType) {
     // Ensure sender is always 'vim' when broadcasting from Vim
     const messageToSend = { ...data, sender: "vim" };
     sockets.forEach((s) => s.send(JSON.stringify(messageToSend)));
@@ -51,7 +60,7 @@ export class WebSocketManager {
     this.lastCursorPos = pos;
   }
 
-  async handleCursorPosMessage(denops: Denops, msg: CursorPos) {
+  async handleCursorPosMessage(denops: Denops, msg: CursorPosMessage & { type: "CursorPos" }) {
     let newCursorPos: { path: string; line: number; col: number } = { ...msg };
     const currentLine = await getCurrentLine(denops);
     const currentCol = await getCurrentCol(denops);
@@ -153,14 +162,14 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
   socket.onmessage = async (e: MessageEvent) => {
     // 解析消息并处理已知类型
     try {
-      const msg = JSON.parse(e.data as string) as Message; // 使用联合类型
+      const msg = JSON.parse(e.data as string) as MessageWithType; // 使用联合类型
       console.log(`Vicode: Received message type: ${msg.type}`); // 记录接收到的类型
 
       switch (msg.type) {
         case "CursorPos":
           // 只处理来自 vscode 的消息
           if (msg.sender === "vscode") {
-            await wsManager.handleCursorPosMessage(denops, msg);
+            await wsManager.handleCursorPosMessage(denops, msg as CursorPosMessage & { type: "CursorPos" });
           }
           break;
         // 添加其他类型的处理逻辑（如果需要）
@@ -174,7 +183,8 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
           break;
         case "ExecuteCommand":
           // Vim 接收此命令但不执行它。记录它。
-          console.log(`Vicode: Received ExecuteCommand: ${msg.command} (ignored)`);
+          const execMsg = msg as ExecuteCommandMessage & { type: "ExecuteCommand" };
+          console.log(`Vicode: Received ExecuteCommand: ${execMsg.command} (ignored)`);
           break;
         default:
           console.warn("Vicode: Received unknown message type:", msg);
