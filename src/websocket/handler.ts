@@ -27,7 +27,45 @@ export class WebSocketHandler {
     this.outputChannel = outputChannel;
   }
 
+  /**
+   * Get server address from environment variable
+   * @returns {string | undefined} Server address in format "host:port" or undefined if not set
+   */
+  private getServerAddressFromEnv(): string | undefined {
+    // Check for SHAREEDIT_SERVER environment variable
+    const serverAddress = process.env.SHAREEDIT_SERVER;
+    if (serverAddress) {
+      this.outputChannel.appendLine(`Found server address in environment SHAREEDIT_SERVER: ${serverAddress}`);
+      return serverAddress;
+    }
+
+    // Also check for SHAREEDIT_ADDRESS environment variable (alternative name)
+    const addressEnv = process.env.SHAREEDIT_ADDRESS;
+    if (addressEnv) {
+      this.outputChannel.appendLine(`Found server address in environment SHAREEDIT_ADDRESS: ${addressEnv}`);
+      return addressEnv;
+    }
+
+    return undefined;
+  }
+
   async connect(): Promise<void> {
+    // First check if server address is set in environment variable
+    const serverAddress = this.getServerAddressFromEnv();
+
+    if (serverAddress) {
+      // If server address is set in environment, use it directly
+      if (this.socket) {
+        this.disconnect();
+      }
+
+      this.outputChannel.appendLine(`Connecting to server from environment: ${serverAddress}`);
+      this.socket = new WebSocket(`ws://${serverAddress}`);
+      this.setupSocketListeners();
+      return;
+    }
+
+    // If no server address in environment, fall back to session selector
     const selectedPort = await showSessionSelector();
 
     if (!selectedPort) {

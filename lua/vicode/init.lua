@@ -3,6 +3,13 @@ local M = {}
 local plugin_name = "shareedit"
 local is_loaded_cache = nil
 
+-- Store server information
+M.server = {
+	port = nil,
+	host = "localhost",
+	address = nil,
+}
+
 function M.is_denops_loaded()
 	if is_loaded_cache == true then
 		return true
@@ -23,11 +30,27 @@ function M.is_denops_loaded()
 end
 
 function M.denops_notify(method, params)
-	local status, err = pcall(vim.fn["denops#notify"], plugin_name, method, params or {})
+	local status, _ = pcall(vim.fn["denops#notify"], plugin_name, method, params or {})
 	if not status then
 		return false
 	end
 	return true
+end
+
+-- Call denops method and get the result
+function M.denops_request(method, params)
+	if not M.is_denops_loaded() then
+		vim.notify("ShareEdit: Denops is not loaded yet", vim.log.levels.ERROR)
+		return nil
+	end
+
+	local status, result = pcall(vim.fn["denops#request"], plugin_name, method, params or {})
+	if not status then
+		vim.notify("ShareEdit: Error calling denops#request: " .. tostring(result), vim.log.levels.ERROR)
+		return nil
+	end
+
+	return result
 end
 
 function M.execute_vscode_command(command, args)
@@ -69,6 +92,44 @@ function M.wait_for_denops_and_notify(method, max_attempts, attempt_interval)
 	end
 
 	wait_and_notify()
+end
+
+-- Start the WebSocket server and get the port number (blocking version)
+-- This function blocks until the server is started and port is obtained
+-- Returns: port number on success, nil on failure
+function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
+	-- Wait for denops to load first
+	local denops_loaded = false
+	local denops_attempt = 0
+
+	while not denops_loaded and denops_attempt < max_attempts do
+		denops_attempt = denops_attempt + 1
+		denops_loaded = M.is_denops_loaded()
+
+		if not denops_loaded then
+			-- Use vim.wait for blocking sleep
+			vim.wait(attempt_interval, function()
+				return false
+			end)
+		end
+	end
+
+	if not denops_loaded then
+		vim.notify("ShareEdit: Timed out waiting for Denops to load. Please try again later.", vim.log.levels.ERROR)
+		return nil
+	end
+
+	local result = M.denops_request("start")
+
+	if result and result.success and result.port then
+		M.server.port = result.port -- Update the module's server port
+		M.server.address = M.server.host .. ":" .. M.server.port -- Update the full address
+		return M.server.port
+	else
+		local error_msg = result and result.error or "Unknown error when starting server"
+		vim.notify("ShareEdit: Failed to start server: " .. error_msg, vim.log.levels.ERROR)
+		return nil
+	end
 end
 
 return M

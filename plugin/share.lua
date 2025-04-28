@@ -38,11 +38,42 @@ vim.api.nvim_create_user_command("ShareEditStart", function()
 	})
 
 	local vicode = require("vicode")
-	vicode.wait_for_denops_and_notify(
-		"start",
-		10, -- max_attempts
-		500 -- attempt_interval (ms)
+
+	-- Use the blocking version to ensure server is started before proceeding
+	local port = vicode.start_server_and_get_port_blocking(10, 500)
+
+	-- Check if server started successfully
+	if not port then
+		vim.notify("ShareEdit: Failed to start server. Cannot launch VSCode.", vim.log.levels.ERROR)
+		return
+	end
+
+	print("ShareEdit: Server started successfully on " .. tostring(vicode.server.address))
+
+	local force_new = true
+
+	local result = vim.fn.system(
+		"git -C " .. vim.fn.shellescape(vim.fn.expand("%:p:h")) .. " rev-parse --show-toplevel 2>/dev/null"
 	)
+	local git_root = vim.v.shell_error ~= 0 and nil or result:gsub("\n", "")
+
+	local cursor_args = { "code-insiders" }
+
+	if force_new then
+		table.insert(cursor_args, "-n")
+	elseif git_root then
+		table.insert(cursor_args, "-r")
+	end
+
+	if git_root then
+		table.insert(cursor_args, git_root)
+	end
+
+	table.insert(cursor_args, "-g")
+	table.insert(cursor_args, string.format("%s:%s:%s", vim.fn.expand("%:p"), vim.fn.line("."), vim.fn.col(".")))
+
+	-- Now we can be sure that vicode.server.address is set correctly
+	vim.system(cursor_args, { detach = false, env = { SHAREEDIT_ADDRESS = vicode.server.address } })
 end, {})
 
 vim.api.nvim_create_user_command("ShareEditStop", function()
@@ -55,7 +86,10 @@ vim.api.nvim_create_user_command("ShareEditStop", function()
 	)
 	-- Remove autocommands here
 	vim.api.nvim_clear_autocmds({ group = augroup_name })
-	print("ShareEdit: Autocommands removed.")
+
+	-- Clear server information in the module
+	vicode.server.port = nil
+	vicode.server.address = nil
 end, {})
 
 print("Vicode Lua plugin loaded")

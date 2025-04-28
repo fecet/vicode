@@ -90,6 +90,27 @@ export function activate(context: vscode.ExtensionContext) {
   });
 
   context.subscriptions.push(connCmd, disconnCmd);
+
+  // Check for auto-connect environment variables
+  const autoConnect = process.env.SHAREEDIT_AUTOCONNECT;
+  const addressEnv = process.env.SHAREEDIT_ADDRESS;
+
+  // Automatically connect on activation if:
+  // 1. SHAREEDIT_AUTOCONNECT is set to a truthy value, or
+  // 2. SHAREEDIT_ADDRESS environment variable is detected
+  if (
+    autoConnect === "1" ||
+    autoConnect === "true" ||
+    autoConnect === "yes" ||
+    addressEnv
+  ) {
+    if (addressEnv) {
+      outputChannel.appendLine("Auto-connecting due to SHAREEDIT_ADDRESS environment variable");
+    } else {
+      outputChannel.appendLine("Auto-connecting due to SHAREEDIT_AUTOCONNECT environment variable");
+    }
+    vscode.commands.executeCommand("shareedit.connect");
+  }
 }
 
 export function deactivate() {
