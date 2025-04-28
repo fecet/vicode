@@ -1,4 +1,4 @@
-# ShareEdit
+# Vicode
 
 A VS Code extension that enables real-time cursor position synchronization between VS Code and Vim editors, making it easier to collaborate or switch between editors seamlessly.
 
@@ -14,20 +14,20 @@ A VS Code extension that enables real-time cursor position synchronization betwe
 ## Requirements
 
 - Visual Studio Code
-- Vim with [vim-shareedit](https://github.com/kbwo/vim-shareedit) plugin installed
+- Vim with Vicode plugin installed
 
 ## Installation
 
 1. Install this extension from the VS Code marketplace
-2. Install the vim-shareedit plugin in Vim ( see [vim-shareedit](https://github.com/kbwo/vim-shareedit) for instructions )
-3. Install the vscode-shareedit extension in VSCode ( see [Marketplace](https://marketplace.visualstudio.com/items?itemName=kbwo.shareedit) )
+2. Install the Vicode plugin in Vim
+3. Install the Vicode extension in VSCode
 
 ## Usage
 
-1. Start a ShareEdit session in Vim using the vim-shareedit plugin
+1. Start a Vicode session in Vim using the `:VicodeStart` command
 2. In VS Code:
    - Open the command palette (Ctrl+Shift+P / Cmd+Shift+P)
-   - Run the "Connect to vim-shareedit" command
+   - Run the "Connect to Vicode" command
    - Select the active session from the quick pick menu
 3. Your cursor positions will now be synchronized between VS Code and Vim. Try moving the cursor in one editor and see it move in the other.
 
@@ -37,27 +37,29 @@ You can set the server address using environment variables to bypass the session
 
 ```bash
 # Set the server address in the format "host:port" (either variable works)
-export SHAREEDIT_SERVER="localhost:8080"
+export VICODE_SERVER="localhost:8080"
 # OR
-export SHAREEDIT_ADDRESS="localhost:8080"
+export VICODE_ADDRESS="localhost:8080"
 ```
 
-When either of these environment variables is set, the extension will connect directly to the specified server without prompting for session selection. The extension checks for `SHAREEDIT_SERVER` first, then falls back to `SHAREEDIT_ADDRESS` if the former is not set.
+When either of these environment variables is set, the extension will connect directly to the specified server without prompting for session selection. The extension checks for `VICODE_SERVER` first, then falls back to `VICODE_ADDRESS` if the former is not set.
 
-You can also set the `SHAREEDIT_AUTOCONNECT` environment variable to automatically connect on startup:
+You can also set the `VICODE_AUTOCONNECT` environment variable to automatically connect on startup:
 
 ```bash
 # Set to 1, true, or yes to enable auto-connect
-export SHAREEDIT_AUTOCONNECT=1
+export VICODE_AUTOCONNECT=1
 ```
 
-Note that if `SHAREEDIT_ADDRESS` is detected, the extension will automatically connect without needing to set `SHAREEDIT_AUTOCONNECT`.
+Note that if `VICODE_ADDRESS` is detected, the extension will automatically connect without needing to set `VICODE_AUTOCONNECT`.
+
+For backward compatibility, the legacy environment variables `SHAREEDIT_SERVER`, `SHAREEDIT_ADDRESS`, and `SHAREEDIT_AUTOCONNECT` are also supported.
 
 ### Command Line Launcher
 
-This extension includes a shell script that makes it easy to launch VSCode with ShareEdit automatically connected. The script:
+This extension includes a shell script that makes it easy to launch VSCode with Vicode automatically connected. The script:
 
-1. Checks for an existing ShareEdit server address in the environment
+1. Checks for an existing Vicode server address in the environment
 2. If not found, tries to read it from the session file
 3. Sets the auto-connect flag
 4. Launches VSCode with all your command line arguments
@@ -66,17 +68,17 @@ To use the launcher:
 
 ```bash
 # Make the script executable (first time only)
-chmod +x /path/to/shareedit-vscode.sh
+chmod +x /path/to/vicode-vscode.sh
 
 # Launch VSCode with auto-connect
-/path/to/shareedit-vscode.sh [your-vscode-arguments]
+/path/to/vicode-vscode.sh [your-vscode-arguments]
 ```
 
 You can create an alias for convenience:
 
 ```bash
 # Add to your .bashrc or .zshrc
-alias vsc='/path/to/shareedit-vscode.sh'
+alias vsc='/path/to/vicode-vscode.sh'
 
 # Then use it like this
 vsc /path/to/your/project
@@ -84,16 +86,16 @@ vsc /path/to/your/project
 
 #### Automatic Environment Variable Setting in Vim
 
-When you start a ShareEdit session in Vim using the `:ShareEditStart` command, the plugin will automatically:
+When you start a Vicode session in Vim using the `:VicodeStart` command, the plugin will automatically:
 
 1. Start the WebSocket server
 2. Get the port number
-3. Set the `SHAREEDIT_SERVER` environment variable to `localhost:<port>` (which will be detected by the VSCode extension)
+3. Set the `VICODE_ADDRESS` environment variable to `localhost:<port>` (which will be detected by the VSCode extension)
 4. Store the server information in the Lua module
 
 This means any VSCode instance launched from this Vim session will automatically connect to the correct server without prompting.
 
-You can check the current server address with the `:ShareEditShowServer` command in Vim.
+You can check the current server address with the `:VicodeShowServer` command in Vim.
 
 #### Accessing Server Information in Lua
 
@@ -118,34 +120,35 @@ This is useful for integrating with other plugins or scripts that need to know t
 
 ## Breaking changes
 
-- From v0.0.8, you no longer need to manually enter ports. You can now select from a list of active ports and their associated directories. Please update vim-shareedit to the latest version to use this feature.
+- The plugin has been renamed from ShareEdit to Vicode. Old commands are still available for backward compatibility but will show deprecation warnings.
+- Configuration directories have been moved from `~/.config/shareedit` to `~/.config/vicode` (Unix) and from `%APPDATA%\shareedit` to `%APPDATA%\vicode` (Windows).
 
 ## Available Commands
 
 ### VSCode Commands
 
-- `Connect to vim-shareedit`: Connect to a ShareEdit session
-- `Disconnect from vim-shareedit`: Disconnect from the current session
+- `Connect to Vicode`: Connect to a Vicode session
+- `Disconnect from Vicode`: Disconnect from the current session
 
 ### Vim Commands
 
-- `:ShareEditStart`: Start the WebSocket server and set environment variable
-- `:ShareEditStop`: Stop the WebSocket server and clear environment variable
-- `:ShareEditShowServer`: Display the current server address in the environment variable
-- `:ShareEditGetPort`: Get the current server port (useful for scripting)
+- `:VicodeStart`: Start the WebSocket server and set environment variable
+- `:VicodeStop`: Stop the WebSocket server and clear environment variable
+- `:VicodeShowServer`: Display the current server address in the environment variable
+- `:VicodeGetPort`: Get the current server port (useful for scripting)
 
 ## Notes
 
-- The extension automatically detects active ShareEdit sessions
+- The extension automatically detects active Vicode sessions
 - Sessions are stored in:
-  - Windows: `%APPDATA%\shareedit\sessions.json`
-  - Unix: `~/.config/shareedit/sessions.json`
+  - Windows: `%APPDATA%\vicode\sessions.json`
+  - Unix: `~/.config/vicode\sessions.json`
 
 ## Troubleshooting
 
 If you encounter connection issues:
 
-1. Ensure the vim-shareedit plugin is properly installed and running
+1. Ensure the Vicode plugin is properly installed and running
 2. Check if the WebSocket server is running on the specified port
 3. Try disconnecting and reconnecting to the session
 

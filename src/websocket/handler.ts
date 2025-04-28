@@ -32,18 +32,32 @@ export class WebSocketHandler {
    * @returns {string | undefined} Server address in format "host:port" or undefined if not set
    */
   private getServerAddressFromEnv(): string | undefined {
-    // Check for SHAREEDIT_SERVER environment variable
-    const serverAddress = process.env.SHAREEDIT_SERVER;
+    // Check for VICODE_SERVER environment variable
+    const serverAddress = process.env.VICODE_SERVER;
     if (serverAddress) {
-      this.outputChannel.appendLine(`Found server address in environment SHAREEDIT_SERVER: ${serverAddress}`);
+      this.outputChannel.appendLine(`Found server address in environment VICODE_SERVER: ${serverAddress}`);
       return serverAddress;
     }
 
-    // Also check for SHAREEDIT_ADDRESS environment variable (alternative name)
-    const addressEnv = process.env.SHAREEDIT_ADDRESS;
+    // Also check for VICODE_ADDRESS environment variable (alternative name)
+    const addressEnv = process.env.VICODE_ADDRESS;
     if (addressEnv) {
-      this.outputChannel.appendLine(`Found server address in environment SHAREEDIT_ADDRESS: ${addressEnv}`);
+      this.outputChannel.appendLine(`Found server address in environment VICODE_ADDRESS: ${addressEnv}`);
       return addressEnv;
+    }
+
+    // For backward compatibility, check legacy environment variables
+    const legacyServerAddress = process.env.SHAREEDIT_SERVER;
+    if (legacyServerAddress) {
+      this.outputChannel.appendLine(`Found server address in legacy environment SHAREEDIT_SERVER: ${legacyServerAddress}`);
+      return legacyServerAddress;
+    }
+
+    // Also check for legacy SHAREEDIT_ADDRESS environment variable
+    const legacyAddressEnv = process.env.SHAREEDIT_ADDRESS;
+    if (legacyAddressEnv) {
+      this.outputChannel.appendLine(`Found server address in legacy environment SHAREEDIT_ADDRESS: ${legacyAddressEnv}`);
+      return legacyAddressEnv;
     }
 
     return undefined;

@@ -1,7 +1,7 @@
 {
   "name": "vicode",
-  "displayName": "Share Edit",
-  "description": "Collaborative editing with Vim",
+  "displayName": "Vicode",
+  "description": "Collaborative editing between VSCode and Vim",
   "version": "0.0.11",
   "publisher": "fecet",
   "repository": {
@@ -21,12 +21,12 @@
   "contributes": {
     "commands": [
       {
-        "command": "shareedit.connect",
-        "title": "Connect to vim-shareedit"
+        "command": "vicode.connect",
+        "title": "Connect to Vicode"
       },
       {
-        "command": "shareedit.disconnect",
-        "title": "Disconnect from vim-shareedit"
+        "command": "vicode.disconnect",
+        "title": "Disconnect from Vicode"
       }
     ]
   },

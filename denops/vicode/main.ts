@@ -122,7 +122,7 @@ export function main(denops: Denops): Promise<void> {
       }
 
       console.log(
-        `ShareEdit: Sending command '${commandStr}' with args: ${JSON.stringify(commandArgs)}`,
+        `Vicode: Sending command '${commandStr}' with args: ${JSON.stringify(commandArgs)}`,
       );
 
       // 使用 toExecuteCommand 函数创建消息
@@ -136,12 +136,12 @@ export function main(denops: Denops): Promise<void> {
     },
 
     async start() {
-      console.log("ShareEdit: start method called in dispatcher");
+      console.log("Vicode: start method called in dispatcher");
       try {
         // 添加超时处理
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
-            reject(new Error("ShareEdit: WebSocket server start timed out"));
+            reject(new Error("Vicode: WebSocket server start timed out"));
           }, 10000); // 10秒超时
         });
 
@@ -151,10 +151,10 @@ export function main(denops: Denops): Promise<void> {
           timeoutPromise
         ]);
 
-        console.log(`ShareEdit: WebSocket server started successfully on port ${port}`);
+        console.log(`Vicode: WebSocket server started successfully on port ${port}`);
         return { success: true, port };
       } catch (error) {
-        console.error("ShareEdit: Failed to start WebSocket server:", error);
+        console.error("Vicode: Failed to start WebSocket server:", error);
         return { success: false, error: String(error) };
       }
     },

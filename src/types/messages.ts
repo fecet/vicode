@@ -1,4 +1,5 @@
 // 导入 protobuf 生成的类型
+// 注意：我们仍然使用 shareedit_pb 因为 gen 文件夹不需要修改
 import type {
   TextContentMessage,
   CursorPosMessage,

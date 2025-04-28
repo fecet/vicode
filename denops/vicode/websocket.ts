@@ -111,13 +111,13 @@ let currentServer: DenoHttpServer | null = null;
 
 export async function stopWsServer() {
   if (!currentServer) {
-    console.log("ShareEdit: No server to stop");
+    console.log("Vicode: No server to stop");
     return;
   }
   await currentServer.shutdown();
   await cleanupSessions();
   currentServer = null;
-  console.log("ShareEdit: Server stopped");
+  console.log("Vicode: Server stopped");
 }
 
 const wsManager = new WebSocketManager();
@@ -142,11 +142,11 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
   wsManager.addSocket(socket);
 
   socket.onopen = () => {
-    console.log("ShareEdit: Client connected");
+    console.log("Vicode: Client connected");
   };
 
   socket.onclose = () => {
-    console.log("ShareEdit: Client disconnected");
+    console.log("Vicode: Client disconnected");
     wsManager.removeSocket(socket);
   };
 
@@ -154,7 +154,7 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
     // 解析消息并处理已知类型
     try {
       const msg = JSON.parse(e.data as string) as Message; // 使用联合类型
-      console.log(`ShareEdit: Received message type: ${msg.type}`); // 记录接收到的类型
+      console.log(`Vicode: Received message type: ${msg.type}`); // 记录接收到的类型
 
       switch (msg.type) {
         case "CursorPos":
@@ -165,63 +165,65 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
           break;
         // 添加其他类型的处理逻辑（如果需要）
         case "TextContent":
-          // Vim 当前不处理来自 VSCode 的 TextContent
+          // Vim 当前不处理来自 VSCode 的 TextContent，但记录它
+          console.log("Vicode: Received TextContent (ignored)");
           break;
         case "SelectionPos":
-          // Vim 当前不处理来自 VSCode 的 SelectionPos
+          // Vim 当前不处理来自 VSCode 的 SelectionPos，但记录它
+          console.log("Vicode: Received SelectionPos (ignored)");
           break;
         case "ExecuteCommand":
           // Vim 接收此命令但不执行它。记录它。
-          console.log(`ShareEdit: Received ExecuteCommand: ${msg.command} (ignored)`);
+          console.log(`Vicode: Received ExecuteCommand: ${msg.command} (ignored)`);
           break;
         default:
-          console.warn("ShareEdit: Received unknown message type:", msg);
+          console.warn("Vicode: Received unknown message type:", msg);
       }
     } catch (error) {
-      console.error("ShareEdit: Error processing message:", error, e.data);
+      console.error("Vicode: Error processing message:", error, e.data);
     }
   };
 
-  socket.onerror = (e: Event) => console.error("ShareEdit error:", e);
+  socket.onerror = (e: Event) => console.error("Vicode error:", e);
   return response;
 }
 
 export async function runWsServer(denops: Denops) {
-  console.log("ShareEdit: Starting WebSocket server...");
+  console.log("Vicode: Starting WebSocket server...");
 
   // 关闭现有服务器（如果存在）
   if (currentServer) {
-    console.log("ShareEdit: Closing existing server");
+    console.log("Vicode: Closing existing server");
     await currentServer.shutdown();
     currentServer = null;
   }
 
   try {
     // 在启动新服务器之前清理过期会话
-    console.log("ShareEdit: Cleaning up expired sessions...");
+    console.log("Vicode: Cleaning up expired sessions...");
     await cleanupSessions();
 
     // 使用 Deno.serve 启动服务器
-    console.log("ShareEdit: Creating new WebSocket server...");
+    console.log("Vicode: Creating new WebSocket server...");
     const server = Deno.serve({ port: 0 }, (req: Request) => handleWs(denops, req));
     currentServer = server as unknown as DenoHttpServer;
     const port = server.addr.port;
-    console.log(`ShareEdit: Server started on port ${port}`);
+    console.log(`Vicode: Server started on port ${port}`);
 
     // Save session information
-    console.log("ShareEdit: Saving session information...");
+    console.log("Vicode: Saving session information...");
     try {
       const configDir = getConfigDir();
-      console.log(`ShareEdit: Using config directory: ${configDir}`);
+      console.log(`Vicode: Using config directory: ${configDir}`);
       await saveSession(port);
-      console.log("ShareEdit: Session information saved successfully");
+      console.log("Vicode: Session information saved successfully");
     } catch (error) {
-      console.error("ShareEdit: Failed to save session information:", error);
+      console.error("Vicode: Failed to save session information:", error);
     }
 
     return port;
   } catch (error) {
-    console.error("ShareEdit: Error starting WebSocket server:", error);
+    console.error("Vicode: Error starting WebSocket server:", error);
     throw error;
   }
 }

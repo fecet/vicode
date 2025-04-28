@@ -1,6 +1,6 @@
 local M = {}
 
-local plugin_name = "shareedit"
+local plugin_name = "vicode"
 local is_loaded_cache = nil
 
 -- Store server information
@@ -40,13 +40,13 @@ end
 -- Call denops method and get the result
 function M.denops_request(method, params)
 	if not M.is_denops_loaded() then
-		vim.notify("ShareEdit: Denops is not loaded yet", vim.log.levels.ERROR)
+		vim.notify("Vicode: Denops is not loaded yet", vim.log.levels.ERROR)
 		return nil
 	end
 
 	local status, result = pcall(vim.fn["denops#request"], plugin_name, method, params or {})
 	if not status then
-		vim.notify("ShareEdit: Error calling denops#request: " .. tostring(result), vim.log.levels.ERROR)
+		vim.notify("Vicode: Error calling denops#request: " .. tostring(result), vim.log.levels.ERROR)
 		return nil
 	end
 
@@ -55,7 +55,7 @@ end
 
 function M.execute_vscode_command(command, args)
 	if type(command) ~= "string" or command == "" then
-		print("ShareEdit Error: command must be a non-empty string.")
+		print("Vicode Error: command must be a non-empty string.")
 		return
 	end
 	M.denops_notify("executeVSCodeCommand", { command, args })
@@ -68,13 +68,13 @@ function M.wait_for_denops_and_notify(method, max_attempts, attempt_interval)
 		current_attempt = current_attempt + 1
 
 		if M.is_denops_loaded() then
-			print("ShareEdit: Denops is loaded, calling method: " .. method)
+			print("Vicode: Denops is loaded, calling method: " .. method)
 			M.denops_notify(method)
 		else
 			if current_attempt < max_attempts then
 				vim.notify(
 					string.format(
-						"ShareEdit: Waiting for Denops to load... (attempt %d/%d)",
+						"Vicode: Waiting for Denops to load... (attempt %d/%d)",
 						current_attempt,
 						max_attempts
 					),
@@ -83,10 +83,10 @@ function M.wait_for_denops_and_notify(method, max_attempts, attempt_interval)
 				vim.defer_fn(wait_and_notify, attempt_interval)
 			else
 				vim.notify(
-					"ShareEdit: Timed out waiting for Denops to load. Please try again later.",
+					"Vicode: Timed out waiting for Denops to load. Please try again later.",
 					vim.log.levels.WARN
 				)
-				vim.notify("ShareEdit: You can check Denops status with :checkhealth denops", vim.log.levels.INFO)
+				vim.notify("Vicode: You can check Denops status with :checkhealth denops", vim.log.levels.INFO)
 			end
 		end
 	end
@@ -115,7 +115,7 @@ function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
 	end
 
 	if not denops_loaded then
-		vim.notify("ShareEdit: Timed out waiting for Denops to load. Please try again later.", vim.log.levels.ERROR)
+		vim.notify("Vicode: Timed out waiting for Denops to load. Please try again later.", vim.log.levels.ERROR)
 		return nil
 	end
 
@@ -127,7 +127,7 @@ function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
 		return M.server.port
 	else
 		local error_msg = result and result.error or "Unknown error when starting server"
-		vim.notify("ShareEdit: Failed to start server: " .. error_msg, vim.log.levels.ERROR)
+		vim.notify("Vicode: Failed to start server: " .. error_msg, vim.log.levels.ERROR)
 		return nil
 	end
 end

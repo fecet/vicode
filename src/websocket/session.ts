@@ -13,13 +13,29 @@ export async function getConfigPath(): Promise<string> {
     if (!appData) {
       throw new Error("APPDATA environment variable not found");
     }
-    return `${appData}\\shareedit\\sessions.json`;
+    // First check for vicode directory
+    const vicodePath = `${appData}\\vicode\\sessions.json`;
+    try {
+      await fs.promises.access(vicodePath);
+      return vicodePath;
+    } catch {
+      // Fall back to legacy shareedit directory
+      return `${appData}\\shareedit\\sessions.json`;
+    }
   } else {
     const homeDir = process.env.HOME;
     if (!homeDir) {
       throw new Error("HOME environment variable not found");
     }
-    return `${homeDir}/.config/shareedit/sessions.json`;
+    // First check for vicode directory
+    const vicodePath = `${homeDir}/.config/vicode/sessions.json`;
+    try {
+      await fs.promises.access(vicodePath);
+      return vicodePath;
+    } catch {
+      // Fall back to legacy shareedit directory
+      return `${homeDir}/.config/shareedit/sessions.json`;
+    }
   }
 }
 
@@ -62,7 +78,7 @@ export async function showSessionSelector(): Promise<number | undefined> {
   const sessions = await getSessions();
 
   if (sessions.length === 0) {
-    vscode.window.showErrorMessage("No active ShareEdit sessions found");
+    vscode.window.showErrorMessage("No active Vicode sessions found");
     return;
   }
 
@@ -95,7 +111,7 @@ export async function showSessionSelector(): Promise<number | undefined> {
     });
 
   const selected = await vscode.window.showQuickPick(items, {
-    placeHolder: "Select a ShareEdit session to connect to",
+    placeHolder: "Select a Vicode session to connect to",
   });
   if (!selected) {
     return;

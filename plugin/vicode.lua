@@ -1,10 +1,10 @@
-if vim.g.loaded_shareedit then
+if vim.g.loaded_vicode then
 	return
 end
-vim.g.loaded_shareedit = 1
+vim.g.loaded_vicode = 1
 
 local denops_notify = require("vicode").denops_notify
-local augroup_name = "ShareEdit" -- Define augroup name globally
+local augroup_name = "Vicode" -- Define augroup name globally
 
 local function sync_cursor_position()
 	local current_mode = vim.fn.mode()
@@ -22,8 +22,8 @@ local function sync_visual_selection()
 	end
 end
 
-vim.api.nvim_create_user_command("ShareEditStart", function()
-	print("ShareEdit: Starting WebSocket server and registering autocommands...")
+vim.api.nvim_create_user_command("VicodeStart", function()
+	print("Vicode: Starting WebSocket server and registering autocommands...")
 	-- Create augroup and register autocommands here
 	vim.api.nvim_create_augroup(augroup_name, { clear = true })
 	vim.api.nvim_create_autocmd({ "CursorMoved", "VimResized" }, {
@@ -44,11 +44,11 @@ vim.api.nvim_create_user_command("ShareEditStart", function()
 
 	-- Check if server started successfully
 	if not port then
-		vim.notify("ShareEdit: Failed to start server. Cannot launch VSCode.", vim.log.levels.ERROR)
+		vim.notify("Vicode: Failed to start server. Cannot launch VSCode.", vim.log.levels.ERROR)
 		return
 	end
 
-	print("ShareEdit: Server started successfully on " .. tostring(vicode.server.address))
+	print("Vicode: Server started successfully on " .. tostring(vicode.server.address))
 
 	local force_new = true
 
@@ -73,11 +73,11 @@ vim.api.nvim_create_user_command("ShareEditStart", function()
 	table.insert(cursor_args, string.format("%s:%s:%s", vim.fn.expand("%:p"), vim.fn.line("."), vim.fn.col(".")))
 
 	-- Now we can be sure that vicode.server.address is set correctly
-	vim.system(cursor_args, { detach = false, env = { SHAREEDIT_ADDRESS = vicode.server.address } })
+	vim.system(cursor_args, { detach = false, env = { VICODE_ADDRESS = vicode.server.address } })
 end, {})
 
-vim.api.nvim_create_user_command("ShareEditStop", function()
-	print("ShareEdit: Stopping WebSocket server and removing autocommands...")
+vim.api.nvim_create_user_command("VicodeStop", function()
+	print("Vicode: Stopping WebSocket server and removing autocommands...")
 	local vicode = require("vicode")
 	vicode.wait_for_denops_and_notify(
 		"stop",
@@ -90,6 +90,17 @@ vim.api.nvim_create_user_command("ShareEditStop", function()
 	-- Clear server information in the module
 	vicode.server.port = nil
 	vicode.server.address = nil
+end, {})
+
+-- 为了向后兼容，保留旧命令但重定向到新命令
+vim.api.nvim_create_user_command("ShareEditStart", function()
+	vim.notify("ShareEdit has been renamed to Vicode. Please use :VicodeStart instead.", vim.log.levels.WARN)
+	vim.cmd("VicodeStart")
+end, {})
+
+vim.api.nvim_create_user_command("ShareEditStop", function()
+	vim.notify("ShareEdit has been renamed to Vicode. Please use :VicodeStop instead.", vim.log.levels.WARN)
+	vim.cmd("VicodeStop")
 end, {})
 
 print("Vicode Lua plugin loaded")

@@ -48,17 +48,28 @@ const debouncedSendCursorPos = debounce(
 );
 
 export function activate(context: vscode.ExtensionContext) {
-  outputChannel = vscode.window.createOutputChannel("shareedit");
+  outputChannel = vscode.window.createOutputChannel("vicode");
   wsHandler = new WebSocketHandler(outputChannel);
 
-  const connCmd = vscode.commands.registerCommand("shareedit.connect", () =>
+  const connCmd = vscode.commands.registerCommand("vicode.connect", () =>
     wsHandler.connect(),
   );
 
   const disconnCmd = vscode.commands.registerCommand(
-    "shareedit.disconnect",
+    "vicode.disconnect",
     () => wsHandler.disconnect(),
   );
+
+  // For backward compatibility
+  const legacyConnCmd = vscode.commands.registerCommand("shareedit.connect", () => {
+    vscode.window.showWarningMessage("The shareedit.connect command is deprecated. Please use vicode.connect instead.");
+    wsHandler.connect();
+  });
+
+  const legacyDisconnCmd = vscode.commands.registerCommand("shareedit.disconnect", () => {
+    vscode.window.showWarningMessage("The shareedit.disconnect command is deprecated. Please use vicode.disconnect instead.");
+    wsHandler.disconnect();
+  });
 
   vscode.window.onDidChangeTextEditorSelection((event) => {
     const document = event.textEditor.document;
@@ -89,15 +100,16 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  context.subscriptions.push(connCmd, disconnCmd);
+  context.subscriptions.push(connCmd, disconnCmd, legacyConnCmd, legacyDisconnCmd);
 
   // Check for auto-connect environment variables
-  const autoConnect = process.env.SHAREEDIT_AUTOCONNECT;
-  const addressEnv = process.env.SHAREEDIT_ADDRESS;
+  const autoConnect = process.env.VICODE_AUTOCONNECT || process.env.SHAREEDIT_AUTOCONNECT;
+  const addressEnv = process.env.VICODE_ADDRESS || process.env.SHAREEDIT_ADDRESS;
 
   // Automatically connect on activation if:
-  // 1. SHAREEDIT_AUTOCONNECT is set to a truthy value, or
-  // 2. SHAREEDIT_ADDRESS environment variable is detected
+  // 1. VICODE_AUTOCONNECT is set to a truthy value, or
+  // 2. VICODE_ADDRESS environment variable is detected
+  // 3. Legacy SHAREEDIT_* variables are also supported for backward compatibility
   if (
     autoConnect === "1" ||
     autoConnect === "true" ||
@@ -105,11 +117,19 @@ export function activate(context: vscode.ExtensionContext) {
     addressEnv
   ) {
     if (addressEnv) {
-      outputChannel.appendLine("Auto-connecting due to SHAREEDIT_ADDRESS environment variable");
+      if (process.env.VICODE_ADDRESS) {
+        outputChannel.appendLine("Auto-connecting due to VICODE_ADDRESS environment variable");
+      } else {
+        outputChannel.appendLine("Auto-connecting due to SHAREEDIT_ADDRESS environment variable (legacy)");
+      }
     } else {
-      outputChannel.appendLine("Auto-connecting due to SHAREEDIT_AUTOCONNECT environment variable");
+      if (process.env.VICODE_AUTOCONNECT) {
+        outputChannel.appendLine("Auto-connecting due to VICODE_AUTOCONNECT environment variable");
+      } else {
+        outputChannel.appendLine("Auto-connecting due to SHAREEDIT_AUTOCONNECT environment variable (legacy)");
+      }
     }
-    vscode.commands.executeCommand("shareedit.connect");
+    vscode.commands.executeCommand("vicode.connect");
   }
 }
 
