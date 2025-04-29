@@ -4,34 +4,38 @@ package vicode;
 
 // TextContent message for sharing text between vim and vscode
 message TextContentMessage {
-  string sender = 1;  // "vscode" or "vim"
-  string path = 2;    // file path
-  string text = 3;    // file content
-  int32 cursor_line = 4;  // cursor line position
-  int32 cursor_col = 5;   // cursor column position
+  string type = 1;    // message type, always "TextContent"
+  string sender = 2;  // "vscode" or "vim"
+  string path = 3;    // file path
+  string text = 4;    // file content
+  int32 cursor_line = 5;  // cursor line position
+  int32 cursor_col = 6;   // cursor column position
 }
 
 // CursorPos message for sharing cursor position
 message CursorPosMessage {
-  string sender = 1;  // "vscode" or "vim"
-  string path = 2;    // file path
-  int32 line = 3;     // line position
-  int32 col = 4;      // column position
+  string type = 1;    // message type, always "CursorPos"
+  string sender = 2;  // "vscode" or "vim"
+  string path = 3;    // file path
+  int32 line = 4;     // line position
+  int32 col = 5;      // column position
 }
 
 // SelectionPos message for sharing selection position
 message SelectionPosMessage {
-  int32 start_line = 1;  // selection start line
-  int32 start_col = 2;   // selection start column
-  int32 end_line = 3;    // selection end line
-  int32 end_col = 4;     // selection end column
-  string path = 5;       // file path
+  string type = 1;       // message type, always "SelectionPos"
+  int32 start_line = 2;  // selection start line
+  int32 start_col = 3;   // selection start column
+  int32 end_line = 4;    // selection end line
+  int32 end_col = 5;     // selection end column
+  string path = 6;       // file path
 }
 
 // ExecuteCommand message for executing commands
 message ExecuteCommandMessage {
-  string command = 1;    // command to execute
-  repeated string args = 2;  // command arguments
+  string type = 1;       // message type, always "ExecuteCommand"
+  string command = 2;    // command to execute
+  repeated string args = 3;  // command arguments
 }
 
 // Empty message for responses that don't need data
@@ -44,7 +48,7 @@ service ViCodeService {
   rpc SendCursorPos(CursorPosMessage) returns (Empty);
   rpc SendSelectionPos(SelectionPosMessage) returns (Empty);
   rpc SendExecuteCommand(ExecuteCommandMessage) returns (Empty);
-  
+
   // Methods for vscode to send messages to vim
   rpc ReceiveTextContent(stream TextContentMessage) returns (stream Empty);
   rpc ReceiveCursorPos(stream CursorPosMessage) returns (stream Empty);

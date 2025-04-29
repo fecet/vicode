@@ -41,6 +41,7 @@ const debouncedSendCursorPos = debounce(
 
     // 创建符合 protobuf 类型的消息
     const cursorPos: CursorPosMessage = {
+      type: "CursorPos",
       sender: "vscode",
       path: document.uri.fsPath,
       line: cursorPosition.line,
@@ -92,6 +93,7 @@ export function activate(context: vscode.ExtensionContext) {
     } else {
       // 创建选择位置消息
       const selectionPos: SelectionPosMessage = {
+        type: "SelectionPos",
         startCol: selection.start.character,
         startLine: selection.start.line,
         endCol: selection.end.character,

@@ -17,12 +17,8 @@ import type {
   ExecuteCommandMessage,
 } from "../gen/vicode_pb.ts";
 
-// Define a type for messages with a type field for JSON serialization
-type MessageWithType =
-  | (TextContentMessage & { type: "TextContent" })
-  | (CursorPosMessage & { type: "CursorPos" })
-  | (SelectionPosMessage & { type: "SelectionPos" })
-  | (ExecuteCommandMessage & { type: "ExecuteCommand" });
+// Define a type for all message types
+type Message = TextContentMessage | CursorPosMessage | SelectionPosMessage | ExecuteCommandMessage;
 
 const wsManager = new WebSocketManager();
 
@@ -34,7 +30,7 @@ export function main(denops: Denops): Promise<void> {
       const path = ensureString(await denops.call("expand", "%:p"));
 
       // 创建光标位置消息
-      const json: CursorPosMessage & { type: "CursorPos" } = {
+      const json: CursorPosMessage = {
         type: "CursorPos",
         sender: "vim",
         path,
@@ -53,7 +49,7 @@ export function main(denops: Denops): Promise<void> {
       const col = await getCurrentCol(denops);
 
       // 创建文本内容消息
-      const body: TextContentMessage & { type: "TextContent" } = {
+      const body: TextContentMessage = {
         type: "TextContent",
         sender: "vim",
         path: currentBuffer,
@@ -96,7 +92,7 @@ export function main(denops: Denops): Promise<void> {
       endCol: unknown,
     ): Promise<void> {
       // 创建选择位置消息
-      const json: SelectionPosMessage & { type: "SelectionPos" } = {
+      const json: SelectionPosMessage = {
         type: "SelectionPos",
         startLine: ensureNumber(startLine),
         startCol: ensureNumber(startCol),
@@ -132,7 +128,7 @@ export function main(denops: Denops): Promise<void> {
       );
 
       // 创建命令执行消息
-      const json: ExecuteCommandMessage & { type: "ExecuteCommand" } = {
+      const json: ExecuteCommandMessage = {
         type: "ExecuteCommand",
         command: commandStr,
         args: commandArgs,
