@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
 import { WebSocketHandler } from "./websocket/handler";
 import {
-  CursorPosMessage,
-  SelectionPosMessage,
-  TextContentMessage,
-  ExecuteCommandMessage
+  VicodeMessage,
+  TextContentPayload,
+  CursorPosPayload,
+  SelectionPosPayload,
+  ExecuteCommandPayload
 } from "../gen/vicode_pb";
 import { getCursorPosition, isFocused } from "./utils/editor";
 import debounce from "debounce";
@@ -40,14 +41,18 @@ const debouncedSendCursorPos = debounce(
     );
 
     // 创建符合 protobuf 类型的消息
-    const cursorPos: CursorPosMessage = {
-      type: "CursorPos",
+    const message: VicodeMessage = {
       sender: "vscode",
-      path: document.uri.fsPath,
-      line: cursorPosition.line,
-      col: cursorPosition.col,
+      payload: {
+        case: "cursorPos",
+        value: {
+          path: document.uri.fsPath,
+          line: cursorPosition.line,
+          col: cursorPosition.col,
+        }
+      }
     };
-    wsHandler.sendMessage(cursorPos);
+    wsHandler.sendMessage(message);
   },
   50, // 防抖时间保持不变
 );
@@ -92,16 +97,21 @@ export function activate(context: vscode.ExtensionContext) {
       debouncedSendCursorPos(document, cursorPosition);
     } else {
       // 创建选择位置消息
-      const selectionPos: SelectionPosMessage = {
-        type: "SelectionPos",
-        startCol: selection.start.character,
-        startLine: selection.start.line,
-        endCol: selection.end.character,
-        endLine: selection.end.line,
-        path: document.uri.fsPath,
+      const message: VicodeMessage = {
+        sender: "vscode",
+        payload: {
+          case: "selectionPos",
+          value: {
+            path: document.uri.fsPath,
+            startCol: selection.start.character,
+            startLine: selection.start.line,
+            endCol: selection.end.character,
+            endLine: selection.end.line,
+          }
+        }
       };
 
-      wsHandler.sendMessage(selectionPos);
+      wsHandler.sendMessage(message);
     }
   });
 

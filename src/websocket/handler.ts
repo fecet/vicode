@@ -1,10 +1,11 @@
 import * as vscode from "vscode";
 import { WebSocket, MessageEvent } from "ws";
 import {
-  TextContentMessage,
-  CursorPosMessage,
-  SelectionPosMessage,
-  ExecuteCommandMessage
+  VicodeMessage,
+  TextContentPayload,
+  CursorPosPayload,
+  SelectionPosPayload,
+  ExecuteCommandPayload
 } from "../../gen/vicode_pb";
 import {
   setCursorPosition,
@@ -17,9 +18,6 @@ import {
   updateLastCursorPosition,
 } from "../utils/sharedState";
 import { showSessionSelector } from "./session";
-
-// Define a type for all message types
-type Message = TextContentMessage | CursorPosMessage | SelectionPosMessage | ExecuteCommandMessage;
 
 export class WebSocketHandler {
   private socket: WebSocket | null = null;
@@ -123,58 +121,51 @@ export class WebSocketHandler {
   }
 
   private async handleMessage(ev: MessageEvent): Promise<void> {
-    const message = JSON.parse(ev.data.toString()) as Message;
+    const message = JSON.parse(ev.data.toString()) as VicodeMessage;
     this.outputChannel.appendLine(`message ${JSON.stringify(message)}`);
 
     const editor = vscode.window.activeTextEditor;
-    // Note: ExecuteCommand might not need an active editor
 
-    switch (message.type) {
-      case "TextContent":
-        if (editor) {
-          await this.handleTextContent(message as TextContentMessage, editor);
-        }
-        break;
-      case "CursorPos":
-        if (editor) {
-          await this.handleCursorPos(message as CursorPosMessage, editor);
-        }
-        break;
-      case "SelectionPos":
-        if (editor) {
-          await this.handleSelectionPos(message as SelectionPosMessage, editor);
-        }
-        break;
-      case "ExecuteCommand":
-        await this.handleExecuteCommand(message as ExecuteCommandMessage);
-        break;
+    // Check which payload type is set
+    if (message.payload.case === "textContent" && message.payload.value && editor) {
+      await this.handleTextContent(message.payload.value, editor);
+    }
+    else if (message.payload.case === "cursorPos" && message.payload.value && editor) {
+      await this.handleCursorPos(message.sender, message.payload.value, editor);
+    }
+    else if (message.payload.case === "selectionPos" && message.payload.value && editor) {
+      await this.handleSelectionPos(message.payload.value, editor);
+    }
+    else if (message.payload.case === "executeCommand" && message.payload.value) {
+      await this.handleExecuteCommand(message.payload.value);
     }
   }
 
   private async handleTextContent(
-    message: TextContentMessage,
+    payload: TextContentPayload,
     editor: vscode.TextEditor,
   ): Promise<void> {
-    if (message.path === editor.document.uri.fsPath) {
-      replaceFileContent(message.text);
-      setCursorPosition(message.cursorLine, message.cursorCol);
+    if (payload.path === editor.document.uri.fsPath) {
+      replaceFileContent(payload.text);
+      setCursorPosition(payload.cursorLine, payload.cursorCol);
     }
   }
 
   private async handleCursorPos(
-    message: CursorPosMessage,
+    sender: string,
+    payload: CursorPosPayload,
     editor: vscode.TextEditor,
   ): Promise<void> {
     this.outputChannel.appendLine(
-      `${message.sender} ${message.path} ${message.line} ${message.col}`,
+      `${sender} ${payload.path} ${payload.line} ${payload.col}`,
     );
     if (isFocused()) {
       return;
     }
-    const document = await vscode.workspace.openTextDocument(message.path);
+    const document = await vscode.workspace.openTextDocument(payload.path);
     await vscode.window.showTextDocument(document);
 
-    const newCursorPos = { line: message.line, col: message.col };
+    const newCursorPos = { line: payload.line, col: payload.col };
     let cursorPos: { line: number; col: number } = newCursorPos;
     const currentLine = editor.selection.active.line;
     const currentCol = editor.selection.active.character;
@@ -188,56 +179,56 @@ export class WebSocketHandler {
 
     if (
       lastCursorPosition &&
-      lastCursorPosition.path === message.path &&
+      lastCursorPosition.path === payload.path &&
       lastCursorPosition.line === cursorPos.line &&
       lastCursorPosition.col === cursorPos.col
     ) {
       return;
     }
 
-    updateLastCursorPosition(message.path, message.line, message.col); // Update last position
+    updateLastCursorPosition(payload.path, payload.line, payload.col); // Update last position
 
-    setCursorPosition(message.line, message.col);
+    setCursorPosition(payload.line, payload.col);
   }
 
   private async handleSelectionPos(
-    message: SelectionPosMessage,
+    payload: SelectionPosPayload,
     editor: vscode.TextEditor,
   ): Promise<void> {
-    if (message.path === editor.document.uri.fsPath) {
+    if (payload.path === editor.document.uri.fsPath) {
       selectRange(
-        message.startLine - 1,
-        message.startCol - 1,
-        message.endLine - 1,
-        message.endCol - 1,
+        payload.startLine - 1,
+        payload.startCol - 1,
+        payload.endLine - 1,
+        payload.endCol - 1,
       );
     }
   }
 
   // 处理 ExecuteCommand 消息的方法
-  private async handleExecuteCommand(message: ExecuteCommandMessage): Promise<void> {
+  private async handleExecuteCommand(payload: ExecuteCommandPayload): Promise<void> {
     try {
       this.outputChannel.appendLine(
-        `Executing command: ${message.command} with args: ${JSON.stringify(message.args)}`,
+        `Executing command: ${payload.command} with args: ${JSON.stringify(payload.args)}`,
       );
 
       // 确保 args 是数组，并将其传递给 executeCommand
-      const args = Array.isArray(message.args) ? message.args : [];
-      await vscode.commands.executeCommand(message.command, ...args);
+      const args = Array.isArray(payload.args) ? payload.args : [];
+      await vscode.commands.executeCommand(payload.command, ...args);
 
-      this.outputChannel.appendLine(`Command ${message.command} executed successfully.`);
+      this.outputChannel.appendLine(`Command ${payload.command} executed successfully.`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.outputChannel.appendLine(
-        `Error executing command ${message.command}: ${errorMessage}`,
+        `Error executing command ${payload.command}: ${errorMessage}`,
       );
       vscode.window.showErrorMessage(
-        `Failed to execute command '${message.command}': ${errorMessage}`,
+        `Failed to execute command '${payload.command}': ${errorMessage}`,
       );
     }
   }
 
-  public sendMessage(message: Message): void {
+  public sendMessage(message: VicodeMessage): void {
     if (!this.socket) {
       return;
     }

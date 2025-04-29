@@ -2,40 +2,47 @@ syntax = "proto3";
 
 package vicode;
 
-// TextContent message for sharing text between vim and vscode
-message TextContentMessage {
-  string type = 1;    // message type, always "TextContent"
-  string sender = 2;  // "vscode" or "vim"
-  string path = 3;    // file path
-  string text = 4;    // file content
-  int32 cursor_line = 5;  // cursor line position
-  int32 cursor_col = 6;   // cursor column position
+// Main message wrapper that contains one of the possible message types
+message VicodeMessage {
+  string sender = 1;  // "vscode" or "vim"
+
+  // Only one of these fields will be set
+  oneof payload {
+    TextContentPayload text_content = 2;
+    CursorPosPayload cursor_pos = 3;
+    SelectionPosPayload selection_pos = 4;
+    ExecuteCommandPayload execute_command = 5;
+  }
 }
 
-// CursorPos message for sharing cursor position
-message CursorPosMessage {
-  string type = 1;    // message type, always "CursorPos"
-  string sender = 2;  // "vscode" or "vim"
-  string path = 3;    // file path
-  int32 line = 4;     // line position
-  int32 col = 5;      // column position
+// TextContent payload for sharing text between vim and vscode
+message TextContentPayload {
+  string path = 1;        // file path
+  string text = 2;        // file content
+  int32 cursor_line = 3;  // cursor line position
+  int32 cursor_col = 4;   // cursor column position
 }
 
-// SelectionPos message for sharing selection position
-message SelectionPosMessage {
-  string type = 1;       // message type, always "SelectionPos"
+// CursorPos payload for sharing cursor position
+message CursorPosPayload {
+  string path = 1;    // file path
+  int32 line = 2;     // line position
+  int32 col = 3;      // column position
+}
+
+// SelectionPos payload for sharing selection position
+message SelectionPosPayload {
+  string path = 1;       // file path
   int32 start_line = 2;  // selection start line
   int32 start_col = 3;   // selection start column
   int32 end_line = 4;    // selection end line
   int32 end_col = 5;     // selection end column
-  string path = 6;       // file path
 }
 
-// ExecuteCommand message for executing commands
-message ExecuteCommandMessage {
-  string type = 1;       // message type, always "ExecuteCommand"
-  string command = 2;    // command to execute
-  repeated string args = 3;  // command arguments
+// ExecuteCommand payload for executing commands
+message ExecuteCommandPayload {
+  string command = 1;        // command to execute
+  repeated string args = 2;  // command arguments
 }
 
 // Empty message for responses that don't need data
@@ -43,15 +50,9 @@ message Empty {}
 
 // Define the service for bidirectional communication
 service ViCodeService {
-  // Methods for vim to send messages to vscode
-  rpc SendTextContent(TextContentMessage) returns (Empty);
-  rpc SendCursorPos(CursorPosMessage) returns (Empty);
-  rpc SendSelectionPos(SelectionPosMessage) returns (Empty);
-  rpc SendExecuteCommand(ExecuteCommandMessage) returns (Empty);
+  // Send a message from vim to vscode
+  rpc SendMessage(VicodeMessage) returns (Empty);
 
-  // Methods for vscode to send messages to vim
-  rpc ReceiveTextContent(stream TextContentMessage) returns (stream Empty);
-  rpc ReceiveCursorPos(stream CursorPosMessage) returns (stream Empty);
-  rpc ReceiveSelectionPos(stream SelectionPosMessage) returns (stream Empty);
-  rpc ReceiveExecuteCommand(stream ExecuteCommandMessage) returns (stream Empty);
+  // Receive messages from vscode to vim
+  rpc ReceiveMessage(stream VicodeMessage) returns (stream Empty);
 }

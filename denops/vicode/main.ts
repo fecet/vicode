@@ -11,14 +11,12 @@ import {
 } from "./utils.ts";
 // 导入 protobuf 生成的类型
 import type {
-  TextContentMessage,
-  CursorPosMessage,
-  SelectionPosMessage,
-  ExecuteCommandMessage,
+  VicodeMessage,
+  TextContentPayload,
+  CursorPosPayload,
+  SelectionPosPayload,
+  ExecuteCommandPayload,
 } from "../gen/vicode_pb.ts";
-
-// Define a type for all message types
-type Message = TextContentMessage | CursorPosMessage | SelectionPosMessage | ExecuteCommandMessage;
 
 const wsManager = new WebSocketManager();
 
@@ -30,14 +28,18 @@ export function main(denops: Denops): Promise<void> {
       const path = ensureString(await denops.call("expand", "%:p"));
 
       // 创建光标位置消息
-      const json: CursorPosMessage = {
-        type: "CursorPos",
+      const message: VicodeMessage = {
         sender: "vim",
-        path,
-        line: lineNum,
-        col: colNum,
+        payload: {
+          case: "cursorPos",
+          value: {
+            path,
+            line: lineNum,
+            col: colNum,
+          }
+        }
       };
-      wsManager.broadcast(json);
+      wsManager.broadcast(message);
     },
     50, // 防抖时间保持不变
   );
@@ -49,16 +51,20 @@ export function main(denops: Denops): Promise<void> {
       const col = await getCurrentCol(denops);
 
       // 创建文本内容消息
-      const body: TextContentMessage = {
-        type: "TextContent",
+      const message: VicodeMessage = {
         sender: "vim",
-        path: currentBuffer,
-        text: await getCurrentText(denops),
-        cursorLine: line,
-        cursorCol: col,
+        payload: {
+          case: "textContent",
+          value: {
+            path: currentBuffer,
+            text: await getCurrentText(denops),
+            cursorLine: line,
+            cursorCol: col,
+          }
+        }
       };
 
-      wsManager.broadcast(body);
+      wsManager.broadcast(message);
       return Promise.resolve();
     },
 
@@ -92,15 +98,20 @@ export function main(denops: Denops): Promise<void> {
       endCol: unknown,
     ): Promise<void> {
       // 创建选择位置消息
-      const json: SelectionPosMessage = {
-        type: "SelectionPos",
-        startLine: ensureNumber(startLine),
-        startCol: ensureNumber(startCol),
-        endLine: ensureNumber(endLine),
-        endCol: ensureNumber(endCol),
-        path: await getCurrentPath(denops),
+      const message: VicodeMessage = {
+        sender: "vim",
+        payload: {
+          case: "selectionPos",
+          value: {
+            path: await getCurrentPath(denops),
+            startLine: ensureNumber(startLine),
+            startCol: ensureNumber(startCol),
+            endLine: ensureNumber(endLine),
+            endCol: ensureNumber(endCol),
+          }
+        }
       };
-      wsManager.broadcast(json);
+      wsManager.broadcast(message);
       return Promise.resolve();
     },
 
@@ -128,12 +139,17 @@ export function main(denops: Denops): Promise<void> {
       );
 
       // 创建命令执行消息
-      const json: ExecuteCommandMessage = {
-        type: "ExecuteCommand",
-        command: commandStr,
-        args: commandArgs,
+      const message: VicodeMessage = {
+        sender: "vim",
+        payload: {
+          case: "executeCommand",
+          value: {
+            command: commandStr,
+            args: commandArgs,
+          }
+        }
       };
-      wsManager.broadcast(json);
+      wsManager.broadcast(message);
       return Promise.resolve();
     },
 
