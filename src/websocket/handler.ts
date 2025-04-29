@@ -212,24 +212,151 @@ export class WebSocketHandler {
   // 处理 ExecuteCommand 消息的方法
   private async handleExecuteCommand(payload: ExecuteCommandPayload): Promise<void> {
     try {
+      // 处理ping命令
+      if (payload.command === "_ping") {
+        this.outputChannel.appendLine("Received ping from Neovim, sending pong response");
+        // 如果有请求ID，发送响应
+        if (payload.requestId) {
+          this.sendCommandResponse(payload.requestId, "pong", false);
+        }
+        return;
+      }
+
+      // 检查是否有特殊命令
+      if (payload.command === "eval" && Array.isArray(payload.args) && payload.args.length > 0) {
+        await this.handleEvalCommand(payload);
+        return;
+      }
+
       this.outputChannel.appendLine(
-        `Executing command: ${payload.command} with args: ${JSON.stringify(payload.args)}`,
+        `Executing command: ${payload.command} with args: ${JSON.stringify(payload.args)} ` +
+        `${payload.requestId ? `(request_id: ${payload.requestId})` : ''}` +
+        `${payload.callbackId ? `(callback_id: ${payload.callbackId})` : ''}`
       );
 
       // 确保 args 是数组，并将其传递给 executeCommand
       const args = Array.isArray(payload.args) ? payload.args : [];
-      await vscode.commands.executeCommand(payload.command, ...args);
+
+      // 执行命令并获取结果
+      const result = await vscode.commands.executeCommand(payload.command, ...args);
 
       this.outputChannel.appendLine(`Command ${payload.command} executed successfully.`);
+
+      // 如果有请求ID，发送响应
+      if (payload.requestId) {
+        this.sendCommandResponse(payload.requestId, result, false);
+      }
+
+      // 如果有回调ID，发送回调结果
+      if (payload.callbackId) {
+        this.sendCallbackResult(payload.callbackId, result, false);
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.outputChannel.appendLine(
         `Error executing command ${payload.command}: ${errorMessage}`,
       );
-      vscode.window.showErrorMessage(
-        `Failed to execute command '${payload.command}': ${errorMessage}`,
-      );
+
+      // 如果有请求ID，发送错误响应
+      if (payload.requestId) {
+        this.sendCommandResponse(payload.requestId, errorMessage, true);
+      }
+
+      // 如果有回调ID，发送错误回调结果
+      if (payload.callbackId) {
+        this.sendCallbackResult(payload.callbackId, errorMessage, true);
+      } else {
+        vscode.window.showErrorMessage(
+          `Failed to execute command '${payload.command}': ${errorMessage}`,
+        );
+      }
     }
+  }
+
+  // 处理eval命令
+  private async handleEvalCommand(payload: ExecuteCommandPayload): Promise<void> {
+    try {
+      if (!Array.isArray(payload.args) || payload.args.length === 0) {
+        throw new Error("Invalid eval command: missing code argument");
+      }
+
+      const code = payload.args[0];
+      const args = payload.args.length > 1 ? payload.args[1] : undefined;
+
+      this.outputChannel.appendLine(`Evaluating JavaScript code: ${code.substring(0, 100)}${code.length > 100 ? '...' : ''}`);
+
+      // 创建一个异步函数来执行代码
+      const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+      const fn = new AsyncFunction('vscode', 'args', 'logger', code);
+
+      // 执行代码
+      const result = await fn(vscode, args, this.outputChannel);
+
+      this.outputChannel.appendLine(`JavaScript evaluation completed successfully.`);
+
+      // 如果有请求ID，发送响应
+      if (payload.requestId) {
+        this.sendCommandResponse(payload.requestId, result, false);
+      }
+
+      // 如果有回调ID，发送回调结果
+      if (payload.callbackId) {
+        this.sendCallbackResult(payload.callbackId, result, false);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.outputChannel.appendLine(`Error evaluating JavaScript: ${errorMessage}`);
+
+      // 如果有请求ID，发送错误响应
+      if (payload.requestId) {
+        this.sendCommandResponse(payload.requestId, errorMessage, true);
+      }
+
+      // 如果有回调ID，发送错误回调结果
+      if (payload.callbackId) {
+        this.sendCallbackResult(payload.callbackId, errorMessage, true);
+      } else {
+        vscode.window.showErrorMessage(`Failed to evaluate JavaScript: ${errorMessage}`);
+      }
+    }
+  }
+
+  // 发送命令响应
+  private sendCommandResponse(requestId: string, result: any, isError: boolean): void {
+    const message: VicodeMessage = {
+      sender: "vscode",
+      payload: {
+        case: "executeCommand",
+        value: {
+          command: "_response",
+          args: [],
+          requestId: requestId,
+          result: result,
+          isError: isError
+        }
+      }
+    };
+
+    this.sendMessage(message);
+  }
+
+  // 发送回调结果
+  private sendCallbackResult(callbackId: string, result: any, isError: boolean): void {
+    const message: VicodeMessage = {
+      sender: "vscode",
+      payload: {
+        case: "executeCommand",
+        value: {
+          command: "_callback",
+          args: [],
+          callbackId: callbackId,
+          result: result,
+          isError: isError
+        }
+      }
+    };
+
+    this.sendMessage(message);
   }
 
   // 处理关闭buffer消息的方法

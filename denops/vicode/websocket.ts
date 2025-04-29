@@ -8,6 +8,16 @@ import type {
   ExecuteCommandPayload,
   CloseBufferPayload,
 } from "../gen/vicode_pb.ts";
+
+// 定义同步请求/响应类型
+interface CommandRequest {
+  id: string;
+  command: string;
+  args: string[];
+  resolve: (value: unknown) => void;
+  reject: (reason: unknown) => void;
+  timer: number | null;
+}
 import {
   getCurrentCol,
   getCurrentLine,
@@ -29,6 +39,9 @@ declare namespace Deno {
 // private field in WebSocketManager is not working
 const sockets = new Set<WebSocket>();
 
+// 存储待处理的命令请求
+const pendingRequests = new Map<string, CommandRequest>();
+
 export class WebSocketManager {
   private lastCursorPos: { path: string; line: number; col: number } | null =
     null;
@@ -44,7 +57,34 @@ export class WebSocketManager {
   broadcast(data: VicodeMessage) {
     // Ensure sender is always 'vim' when broadcasting from Vim
     const messageToSend = { ...data, sender: "vim" };
-    sockets.forEach((s) => s.send(JSON.stringify(messageToSend)));
+
+    // 检查是否有可用的socket
+    if (sockets.size === 0) {
+      console.warn("Vicode: No connected clients to broadcast to");
+      return;
+    }
+
+    // 检查每个socket的状态
+    let activeSockets = 0;
+    sockets.forEach((s) => {
+      if (s.readyState === WebSocket.OPEN) {
+        try {
+          s.send(JSON.stringify(messageToSend));
+          activeSockets++;
+        } catch (error) {
+          console.error("Vicode: Error sending message:", error);
+        }
+      } else {
+        console.warn(`Vicode: Socket not in OPEN state (state: ${s.readyState}), removing it`);
+        this.removeSocket(s);
+      }
+    });
+
+    if (activeSockets === 0) {
+      console.warn("Vicode: No active sockets to broadcast to");
+    } else {
+      console.log(`Vicode: Broadcasted message to ${activeSockets} clients`);
+    }
   }
 
   getLastCursorPos() {
@@ -53,6 +93,76 @@ export class WebSocketManager {
 
   setLastCursorPos(pos: { path: string; line: number; col: number }) {
     this.lastCursorPos = pos;
+  }
+
+  // 发送命令并等待响应
+  async sendCommandAndWaitForResponse(command: string, args: string[], timeout: number): Promise<unknown> {
+    if (sockets.size === 0) {
+      throw new Error("No connected clients");
+    }
+
+    return new Promise((resolve, reject) => {
+      // 生成唯一请求ID
+      const requestId = crypto.randomUUID();
+
+      // 创建命令执行消息，包含请求ID
+      const message: VicodeMessage = {
+        sender: "vim",
+        payload: {
+          case: "executeCommand",
+          value: {
+            command,
+            args,
+            requestId: requestId,
+          }
+        }
+      };
+
+      // 设置超时处理
+      const timer = setTimeout(() => {
+        if (pendingRequests.has(requestId)) {
+          pendingRequests.delete(requestId);
+          reject(new Error(`Command '${command}' timed out after ${timeout}ms`));
+        }
+      }, timeout);
+
+      // 存储请求信息
+      pendingRequests.set(requestId, {
+        id: requestId,
+        command,
+        args,
+        resolve,
+        reject,
+        timer: timer as unknown as number, // 类型转换以解决TypeScript错误
+      });
+
+      // 发送请求
+      this.broadcast(message);
+    });
+  }
+
+  // 处理命令响应
+  handleCommandResponse(requestId: string, result: unknown, isError: boolean): void {
+    const request = pendingRequests.get(requestId);
+    if (!request) {
+      console.warn(`Vicode: Received response for unknown request: ${requestId}`);
+      return;
+    }
+
+    // 清除超时计时器
+    if (request.timer !== null) {
+      clearTimeout(request.timer);
+    }
+
+    // 从待处理请求中移除
+    pendingRequests.delete(requestId);
+
+    // 调用相应的回调
+    if (isError) {
+      request.reject(result);
+    } else {
+      request.resolve(result);
+    }
   }
 
   async handleCursorPosMessage(denops: Denops, payload: CursorPosPayload) {
@@ -151,10 +261,28 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
 
   socket.onopen = () => {
     console.log("Vicode: Client connected");
+
+    // 发送一个ping消息，确保连接正常
+    try {
+      const pingMessage: VicodeMessage = {
+        sender: "vim",
+        payload: {
+          case: "executeCommand",
+          value: {
+            command: "_ping",
+            args: [],
+          }
+        }
+      };
+      socket.send(JSON.stringify(pingMessage));
+      console.log("Vicode: Sent ping message to VSCode");
+    } catch (error) {
+      console.error("Vicode: Error sending ping message:", error);
+    }
   };
 
-  socket.onclose = () => {
-    console.log("Vicode: Client disconnected");
+  socket.onclose = (event) => {
+    console.log(`Vicode: Client disconnected (code: ${event.code}, reason: ${event.reason || "none"})`);
     wsManager.removeSocket(socket);
   };
 
@@ -178,8 +306,32 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
           console.log("Vicode: Received SelectionPos (ignored)");
         }
         else if (msg.payload.case === "executeCommand" && msg.payload.value) {
-          // Vim 接收此命令但不执行它。记录它。
-          console.log(`Vicode: Received ExecuteCommand: ${msg.payload.value.command} (ignored)`);
+          // 检查是否是命令响应
+          if (msg.payload.value.requestId) {
+            console.log(`Vicode: Received command response for request: ${msg.payload.value.requestId}`);
+            wsManager.handleCommandResponse(
+              msg.payload.value.requestId,
+              msg.payload.value.result,
+              msg.payload.value.isError || false
+            );
+          }
+          // 检查是否是回调响应
+          else if (msg.payload.value.callbackId) {
+            console.log(`Vicode: Received command result for callback: ${msg.payload.value.callbackId}`);
+            await denops.dispatch(
+              "vicode",
+              "handleCommandResult",
+              {
+                callback_id: msg.payload.value.callbackId,
+                result: msg.payload.value.result,
+                is_error: msg.payload.value.isError || false
+              }
+            );
+          }
+          // 普通命令（不处理）
+          else {
+            console.log(`Vicode: Received ExecuteCommand: ${msg.payload.value.command} (ignored)`);
+          }
         }
         else if (msg.payload.case === "closeBuffer" && msg.payload.value) {
           // 暂时注释掉处理来自VSCode的关闭buffer请求的代码
@@ -196,7 +348,13 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
     }
   };
 
-  socket.onerror = (e: Event) => console.error("Vicode error:", e);
+  socket.onerror = (e: Event) => {
+    console.error("Vicode error:", e);
+    wsManager.removeSocket(socket);
+
+    // 记录错误，但不尝试重新连接，因为客户端会自动重连
+    console.log("Vicode: WebSocket error occurred, client will reconnect automatically");
+  };
   return response;
 }
 

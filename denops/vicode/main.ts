@@ -3,6 +3,7 @@ import { debounce } from "https://deno.land/std@0.224.0/async/mod.ts";
 import { runWsServer, stopWsServer, WebSocketManager } from "./websocket.ts";
 import {
   ensureNumber,
+  ensureObject,
   ensureString,
   getCurrentCol,
   getCurrentLine,
@@ -205,6 +206,91 @@ export function main(denops: Denops): Promise<void> {
     async closeBufferFromVSCode(path: unknown): Promise<void> {
       const filePath = ensureString(path);
       console.log(`Vicode: Received request to close buffer for path: ${filePath} (function disabled)`);
+      return Promise.resolve();
+    },
+
+    // 异步执行VSCode命令并支持回调
+    async executeVSCodeCommandAsync(
+      command: unknown,
+      args: unknown,
+      callback_id: unknown
+    ): Promise<void> {
+      const commandStr = ensureString(command);
+      // 确保参数是字符串数组
+      let commandArgs: string[] = [];
+
+      if (args !== undefined && args !== null) {
+        if (Array.isArray(args)) {
+          commandArgs = args.map(arg => String(arg));
+        } else {
+          commandArgs = [String(args)];
+        }
+      }
+
+      console.log(
+        `Vicode: Sending async command '${commandStr}' with args: ${JSON.stringify(commandArgs)} and callback_id: ${callback_id}`,
+      );
+
+      // 创建命令执行消息，包含回调ID
+      const message: VicodeMessage = {
+        sender: "vim",
+        payload: {
+          case: "executeCommand",
+          value: {
+            command: commandStr,
+            args: commandArgs,
+            callbackId: callback_id ? String(callback_id) : undefined,
+          }
+        }
+      };
+      wsManager.broadcast(message);
+      return Promise.resolve();
+    },
+
+    // 同步执行VSCode命令
+    async executeVSCodeCommandSync(
+      command: unknown,
+      args: unknown,
+      timeout: unknown
+    ): Promise<Record<string, unknown>> {
+      const commandStr = ensureString(command);
+      const timeoutMs = ensureNumber(timeout || 5000);
+
+      // 确保参数是字符串数组
+      let commandArgs: string[] = [];
+
+      if (args !== undefined && args !== null) {
+        if (Array.isArray(args)) {
+          commandArgs = args.map(arg => String(arg));
+        } else {
+          commandArgs = [String(args)];
+        }
+      }
+
+      console.log(
+        `Vicode: Sending sync command '${commandStr}' with args: ${JSON.stringify(commandArgs)} and timeout: ${timeoutMs}ms`,
+      );
+
+      try {
+        // 使用WebSocket管理器发送同步请求
+        const result = await wsManager.sendCommandAndWaitForResponse(commandStr, commandArgs, timeoutMs);
+        return { success: true, data: result };
+      } catch (error) {
+        console.error(`Vicode: Error executing command ${commandStr}:`, error);
+        return { success: false, error: String(error) };
+      }
+    },
+
+    // 处理来自VSCode的命令执行结果回调
+    async handleCommandResult(params: unknown): Promise<void> {
+      const { callback_id, result, is_error } = ensureObject(params);
+      const id = ensureNumber(callback_id);
+
+      console.log(`Vicode: Received command result for callback_id: ${id}, is_error: ${is_error}`);
+
+      // 调用Lua回调函数
+      await denops.call("luaeval", "require('vicode.api').invoke_callback(_A[1], _A[2], _A[3])", [id, result, is_error]);
+
       return Promise.resolve();
     },
   };

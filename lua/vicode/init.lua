@@ -10,6 +10,15 @@ M.server = {
 	address = nil,
 }
 
+-- Load API module
+local api = require("vicode.api")
+
+-- Export API functions
+M.action = api.action
+M.call = api.call
+M.eval = api.eval
+M.eval_async = api.eval_async
+
 function M.is_denops_loaded()
 	if is_loaded_cache == true then
 		return true

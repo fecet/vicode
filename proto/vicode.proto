@@ -44,6 +44,10 @@ message SelectionPosPayload {
 message ExecuteCommandPayload {
   string command = 1;        // command to execute
   repeated string args = 2;  // command arguments
+  string request_id = 3;     // optional request ID for synchronous calls
+  string callback_id = 4;    // optional callback ID for asynchronous calls
+  bool is_error = 5;         // whether the result is an error
+  string result = 6;         // result or error message
 }
 
 // CloseBuffer payload for synchronizing buffer/tab closures
