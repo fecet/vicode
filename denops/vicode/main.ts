@@ -16,6 +16,7 @@ import type {
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,
+  CloseBufferPayload,
 } from "../gen/vicode_pb.ts";
 
 const wsManager = new WebSocketManager();
@@ -179,6 +180,32 @@ export function main(denops: Denops): Promise<void> {
 
     async stop() {
       await stopWsServer();
+    },
+
+    // 处理关闭buffer的方法
+    async closeBuffer(path: unknown): Promise<void> {
+      const filePath = ensureString(path);
+      console.log(`Vicode: Sending close buffer message for path: ${filePath}`);
+
+      // 创建关闭buffer消息
+      const message: VicodeMessage = {
+        sender: "vim",
+        payload: {
+          case: "closeBuffer",
+          value: {
+            path: filePath,
+          }
+        }
+      };
+      wsManager.broadcast(message);
+      return Promise.resolve();
+    },
+
+    // 处理来自VSCode的关闭buffer请求 (暂时注释掉)
+    async closeBufferFromVSCode(path: unknown): Promise<void> {
+      const filePath = ensureString(path);
+      console.log(`Vicode: Received request to close buffer for path: ${filePath} (function disabled)`);
+      return Promise.resolve();
     },
   };
 

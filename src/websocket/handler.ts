@@ -5,7 +5,8 @@ import {
   TextContentPayload,
   CursorPosPayload,
   SelectionPosPayload,
-  ExecuteCommandPayload
+  ExecuteCommandPayload,
+  CloseBufferPayload
 } from "../../gen/vicode_pb";
 import {
   setCursorPosition,
@@ -139,6 +140,9 @@ export class WebSocketHandler {
     else if (message.payload.case === "executeCommand" && message.payload.value) {
       await this.handleExecuteCommand(message.payload.value);
     }
+    else if (message.payload.case === "closeBuffer" && message.payload.value) {
+      await this.handleCloseBuffer(message.payload.value);
+    }
   }
 
   private async handleTextContent(
@@ -225,6 +229,33 @@ export class WebSocketHandler {
       vscode.window.showErrorMessage(
         `Failed to execute command '${payload.command}': ${errorMessage}`,
       );
+    }
+  }
+
+  // 处理关闭buffer消息的方法
+  private async handleCloseBuffer(payload: CloseBufferPayload): Promise<void> {
+    try {
+      this.outputChannel.appendLine(`Received request to close tab for file: ${payload.path}`);
+
+      // 查找匹配路径的文档
+      const documents = vscode.workspace.textDocuments.filter(
+        doc => doc.uri.fsPath === payload.path
+      );
+
+      if (documents.length > 0) {
+        // 找到匹配的文档，关闭它
+        for (const doc of documents) {
+          // 使用内置命令关闭编辑器
+          await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+          this.outputChannel.appendLine(`Successfully closed tab for file: ${payload.path}`);
+        }
+      } else {
+        this.outputChannel.appendLine(`No open tab found for file: ${payload.path}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.outputChannel.appendLine(`Error closing tab: ${errorMessage}`);
+      vscode.window.showErrorMessage(`Failed to close tab: ${errorMessage}`);
     }
   }
 

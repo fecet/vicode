@@ -22,6 +22,15 @@ local function sync_visual_selection()
 	end
 end
 
+-- Function to notify VSCode when a buffer is closed in Neovim
+local function notify_buffer_close()
+	local file_path = vim.fn.expand("%:p")
+	if file_path ~= "" then
+		print("Vicode: Buffer closed, notifying VSCode to close tab for: " .. file_path)
+		denops_notify("closeBuffer", { file_path })
+	end
+end
+
 vim.api.nvim_create_user_command("VicodeStart", function()
 	print("Vicode: Starting WebSocket server and registering autocommands...")
 	-- Create augroup and register autocommands here
@@ -35,6 +44,13 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 		group = augroup_name,
 		pattern = "*",
 		callback = sync_cursor_position,
+	})
+
+	-- Add autocmd for buffer delete events to sync with VSCode
+	vim.api.nvim_create_autocmd("BufDelete", {
+		group = augroup_name,
+		pattern = "*",
+		callback = notify_buffer_close,
 	})
 
 	local vicode = require("vicode")

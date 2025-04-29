@@ -5,7 +5,8 @@ import {
   TextContentPayload,
   CursorPosPayload,
   SelectionPosPayload,
-  ExecuteCommandPayload
+  ExecuteCommandPayload,
+  CloseBufferPayload
 } from "../gen/vicode_pb";
 import { getCursorPosition, isFocused } from "./utils/editor";
 import debounce from "debounce";

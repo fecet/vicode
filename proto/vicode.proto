@@ -12,6 +12,7 @@ message VicodeMessage {
     CursorPosPayload cursor_pos = 3;
     SelectionPosPayload selection_pos = 4;
     ExecuteCommandPayload execute_command = 5;
+    CloseBufferPayload close_buffer = 6;
   }
 }
 
@@ -43,6 +44,11 @@ message SelectionPosPayload {
 message ExecuteCommandPayload {
   string command = 1;        // command to execute
   repeated string args = 2;  // command arguments
+}
+
+// CloseBuffer payload for synchronizing buffer/tab closures
+message CloseBufferPayload {
+  string path = 1;           // file path to close
 }
 
 // Empty message for responses that don't need data

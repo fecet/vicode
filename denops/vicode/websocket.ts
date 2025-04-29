@@ -6,6 +6,7 @@ import type {
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,
+  CloseBufferPayload,
 } from "../gen/vicode_pb.ts";
 import {
   getCurrentCol,
@@ -179,6 +180,12 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
         else if (msg.payload.case === "executeCommand" && msg.payload.value) {
           // Vim 接收此命令但不执行它。记录它。
           console.log(`Vicode: Received ExecuteCommand: ${msg.payload.value.command} (ignored)`);
+        }
+        else if (msg.payload.case === "closeBuffer" && msg.payload.value) {
+          // 暂时注释掉处理来自VSCode的关闭buffer请求的代码
+          console.log(`Vicode: Received CloseBuffer request for path: ${msg.payload.value.path} (ignored)`);
+          // 以下代码被注释掉，因为我们暂时只需要Neovim到VSCode的单向同步
+          // await denops.dispatch("vicode", "closeBufferFromVSCode", msg.payload.value.path);
         }
         else {
           console.warn("Vicode: Received unknown message payload type:", msg);
