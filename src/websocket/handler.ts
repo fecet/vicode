@@ -16,7 +16,7 @@ import {
   lastCursorPosition,
   updateLastCursorPosition,
 } from "../utils/sharedState";
-import { showSessionSelector } from "./session";
+
 
 export class WebSocketHandler {
   private socket: WebSocket | null = null;
@@ -63,33 +63,21 @@ export class WebSocketHandler {
   }
 
   async connect(): Promise<void> {
-    // First check if server address is set in environment variable
+    // Check if server address is set in environment variable
     const serverAddress = this.getServerAddressFromEnv();
 
-    if (serverAddress) {
-      // If server address is set in environment, use it directly
-      if (this.socket) {
-        this.disconnect();
-      }
-
-      this.outputChannel.appendLine(`Connecting to server from environment: ${serverAddress}`);
-      this.socket = new WebSocket(`ws://${serverAddress}`);
-      this.setupSocketListeners();
+    if (!serverAddress) {
+      vscode.window.showErrorMessage("No Vicode server address found in environment variables. Please set VICODE_ADDRESS.");
       return;
     }
 
-    // If no server address in environment, fall back to session selector
-    const selectedPort = await showSessionSelector();
-
-    if (!selectedPort) {
-      return;
-    }
-
+    // If server address is set in environment, use it directly
     if (this.socket) {
       this.disconnect();
     }
 
-    this.socket = new WebSocket(`ws://localhost:${selectedPort}`);
+    this.outputChannel.appendLine(`Connecting to server from environment: ${serverAddress}`);
+    this.socket = new WebSocket(`ws://${serverAddress}`);
     this.setupSocketListeners();
   }
 
