@@ -81,8 +81,6 @@ function M.action(name, opts)
     callback_id
   }
 
-  -- 记录命令执行
-  vim.notify("Vicode: Executing command: " .. name, config.options.debug.log_level)
 
   -- 发送命令
   local success = vicode.denops_notify("executeVSCodeCommandAsync", params)
@@ -129,8 +127,6 @@ function M.call(name, opts, timeout)
     error(error_msg)
   end
 
-  -- 记录命令执行
-  vim.notify(string.format("Vicode: Executing command synchronously: %s (timeout: %dms)", name, timeout), config.options.debug.log_level)
 
   -- 创建参数数组，而不是对象
   local params = {

@@ -81,8 +81,6 @@ export class WebSocketManager {
 
     if (activeSockets === 0) {
       console.warn("Vicode: No active sockets to broadcast to");
-    } else {
-      console.log(`Vicode: Broadcasted message to ${activeSockets} clients`);
     }
   }
 
@@ -288,7 +286,6 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
     // 解析消息并处理已知类型
     try {
       const msg = JSON.parse(e.data as string) as VicodeMessage;
-      console.log(`Vicode: Received message payload type: ${msg.payload?.case}`);
 
       // 只处理来自 vscode 的消息
       if (msg.sender === "vscode") {
