@@ -21,6 +21,8 @@ import {
 export class WebSocketHandler {
   private socket: WebSocket | null = null;
   private outputChannel: vscode.OutputChannel;
+  private connectionReady: boolean = false; // 新增连接就绪标志
+  private pendingMessages: VicodeMessage[] = []; // 存储连接建立前的消息
 
   constructor(outputChannel: vscode.OutputChannel) {
     this.outputChannel = outputChannel;
@@ -62,7 +64,7 @@ export class WebSocketHandler {
     return undefined;
   }
 
-  async connect(): Promise<void> {
+  async connect(maxRetries = 5, retryInterval = 1000): Promise<void> {
     // Check if server address is set in environment variable
     const serverAddress = this.getServerAddressFromEnv();
 
@@ -77,13 +79,135 @@ export class WebSocketHandler {
     }
 
     this.outputChannel.appendLine(`Connecting to server from environment: ${serverAddress}`);
-    this.socket = new WebSocket(`ws://${serverAddress}`);
-    this.setupSocketListeners();
+
+    // 添加重试逻辑
+    let retryCount = 0;
+    const connectWithRetry = () => {
+      this.outputChannel.appendLine(`Connection attempt ${retryCount + 1}/${maxRetries + 1}`);
+
+      this.socket = new WebSocket(`ws://${serverAddress}`);
+
+      // 设置连接超时
+      const connectionTimeout = setTimeout(() => {
+        if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
+          this.outputChannel.appendLine(`Connection attempt ${retryCount + 1} timed out`);
+          this.socket.close();
+          retryOrFail();
+        }
+      }, 5000); // 5秒连接超时
+
+      // 设置错误处理
+      this.socket.onerror = (error) => {
+        clearTimeout(connectionTimeout);
+        this.outputChannel.appendLine(`Connection error on attempt ${retryCount + 1}: ${error}`);
+        retryOrFail();
+      };
+
+      // 设置连接成功处理
+      this.socket.onopen = () => {
+        clearTimeout(connectionTimeout);
+        this.outputChannel.appendLine(`Connected to server on attempt ${retryCount + 1}`);
+        vscode.window.showInformationMessage(`Connected to WebSocket server`);
+        this.setupSocketListeners();
+
+        // 设置连接就绪状态
+        this.connectionReady = true;
+        this.outputChannel.appendLine("Connection marked as ready");
+
+        // 发送所有待处理的消息
+        if (this.pendingMessages.length > 0) {
+          this.outputChannel.appendLine(`Sending ${this.pendingMessages.length} queued messages`);
+
+          // 只发送最新的光标位置消息，避免发送过多历史位置
+          const cursorPosMessages = this.pendingMessages.filter(m => m.payload.case === "cursorPos");
+          const selectionPosMessages = this.pendingMessages.filter(m => m.payload.case === "selectionPos");
+
+          // 如果有光标位置消息，只发送最后一条
+          if (cursorPosMessages.length > 0) {
+            const latestCursorPos = cursorPosMessages[cursorPosMessages.length - 1];
+            this.outputChannel.appendLine(`Sending latest cursor position message (discarding ${cursorPosMessages.length - 1} older ones)`);
+            this.socket?.send(JSON.stringify(latestCursorPos));
+          }
+
+          // 如果有选择位置消息，只发送最后一条
+          if (selectionPosMessages.length > 0) {
+            const latestSelectionPos = selectionPosMessages[selectionPosMessages.length - 1];
+            this.outputChannel.appendLine(`Sending latest selection position message (discarding ${selectionPosMessages.length - 1} older ones)`);
+            this.socket?.send(JSON.stringify(latestSelectionPos));
+          }
+
+          // 清空待处理消息队列
+          this.pendingMessages = [];
+        }
+      };
+
+      // 设置关闭处理
+      this.socket.onclose = (event) => {
+        clearTimeout(connectionTimeout);
+
+        // 重置连接状态
+        this.connectionReady = false;
+
+        // 记录详细的关闭信息
+        this.outputChannel.appendLine(`Connection closed on attempt ${retryCount + 1}:`);
+        this.outputChannel.appendLine(`- Close code: ${event.code}`);
+        this.outputChannel.appendLine(`- Close reason: ${event.reason || "No reason provided"}`);
+        this.outputChannel.appendLine(`- Was clean: ${event.wasClean ? "Yes" : "No"}`);
+
+        // 根据关闭代码提供诊断信息
+        if (event.code === 1000) {
+          this.outputChannel.appendLine("- Diagnosis: Normal closure, connection successfully completed");
+        } else if (event.code === 1001) {
+          this.outputChannel.appendLine("- Diagnosis: Endpoint going away, server is shutting down");
+        } else if (event.code === 1006) {
+          this.outputChannel.appendLine("- Diagnosis: Abnormal closure, connection was closed abnormally");
+        } else if (event.code === 1011) {
+          this.outputChannel.appendLine("- Diagnosis: Server error, server encountered an unexpected condition");
+        }
+
+        // 只有在初始连接阶段才重试，避免正常关闭时也重试
+        // 如果是正常关闭(1000)或服务器关闭(1001)，则不重试
+        if (retryCount < maxRetries && !this.isConnected() && event.code !== 1000 && event.code !== 1001) {
+          this.outputChannel.appendLine("- Action: Will retry connection");
+          retryOrFail();
+        } else {
+          this.outputChannel.appendLine("- Action: Will not retry connection");
+          // 如果不再重试，清空待处理消息队列
+          if (this.pendingMessages.length > 0) {
+            this.outputChannel.appendLine(`- Discarding ${this.pendingMessages.length} queued messages`);
+            this.pendingMessages = [];
+          }
+        }
+      };
+    };
+
+    // 重试或失败处理
+    const retryOrFail = () => {
+      if (retryCount < maxRetries) {
+        retryCount++;
+        this.outputChannel.appendLine(`Retrying connection in ${retryInterval}ms (${retryCount}/${maxRetries})...`);
+        setTimeout(connectWithRetry, retryInterval);
+      } else {
+        this.outputChannel.appendLine(`Failed to connect after ${maxRetries + 1} attempts`);
+        vscode.window.showErrorMessage(`Failed to connect to Vicode server after ${maxRetries + 1} attempts`);
+        this.socket = null;
+      }
+    };
+
+    // 开始第一次连接尝试
+    connectWithRetry();
+  }
+
+  // 检查是否已连接
+  private isConnected(): boolean {
+    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
   }
 
   public disconnect(): void {
     this.socket?.close();
     this.socket = null;
+    this.connectionReady = false; // 重置连接状态
+    this.pendingMessages = []; // 清空待处理消息
     vscode.window.showInformationMessage(`Disconnected from WebSocket server`);
   }
 
@@ -92,19 +216,10 @@ export class WebSocketHandler {
       return;
     }
 
-    this.socket.onopen = () => {
-      this.outputChannel.appendLine("Connected to server");
-      vscode.window.showInformationMessage(`Connected to WebSocket server`);
-    };
-    this.socket.onclose = () => {
-      this.outputChannel.appendLine("Disconnected from server");
-    };
-
-    this.socket.onerror = (error) => {
-      this.outputChannel.appendLine(`Error: ${error}`);
-    };
-
+    // 只添加消息处理程序，其他事件处理程序已在connect方法中设置
     this.socket.addEventListener("message", this.handleMessage.bind(this));
+
+    this.outputChannel.appendLine("Socket listeners set up");
   }
 
   private async handleMessage(ev: MessageEvent): Promise<void> {
@@ -360,23 +475,52 @@ export class WebSocketHandler {
   }
 
   public sendMessage(message: VicodeMessage): void {
-    if (!this.socket) {
-      return;
-    }
-    if (this.socket?.readyState !== WebSocket.OPEN) {
-      vscode.window.showErrorMessage(
-        `Not connected, status: ${this.socket?.readyState}`,
-      );
-      this.socket?.close();
-      this.socket = null;
+    // 如果连接尚未就绪，将消息存储到待发送队列中
+    if (!this.connectionReady) {
+      // 只存储光标位置和选择位置消息，其他消息（如命令执行）直接丢弃
+      if (message.payload.case === "cursorPos" || message.payload.case === "selectionPos") {
+        // 限制队列大小，避免内存泄漏
+        if (this.pendingMessages.length < 50) {
+          this.pendingMessages.push(message);
+          this.outputChannel.appendLine(`Message queued (connection not ready): ${message.payload.case}`);
+        }
+      } else {
+        this.outputChannel.appendLine(`Message discarded (connection not ready): ${message.payload.case}`);
+      }
       return;
     }
 
-    this.socket.send(JSON.stringify(message));
+    // 连接就绪但socket不存在，这是一个异常情况
+    if (!this.socket) {
+      this.outputChannel.appendLine("Cannot send message: socket is null but connection is marked as ready");
+      this.connectionReady = false; // 重置连接状态
+      return;
+    }
+
+    // 连接就绪但socket未打开，这可能是连接断开或正在关闭
+    if (this.socket.readyState !== WebSocket.OPEN) {
+      this.outputChannel.appendLine(`Cannot send message: socket not in OPEN state (${this.getSocketStateString(this.socket.readyState)})`);
+
+      // 如果是CONNECTING状态，可能是连接正在建立中，不做特殊处理
+      if (this.socket.readyState !== WebSocket.CONNECTING) {
+        this.connectionReady = false; // 重置连接状态
+      }
+      return;
+    }
+
+    // 连接就绪且socket打开，发送消息
+    try {
+      this.socket.send(JSON.stringify(message));
+    } catch (error) {
+      this.outputChannel.appendLine(`Error sending message: ${error}`);
+      this.connectionReady = false; // 发送失败，重置连接状态
+    }
   }
 
   public close(): void {
     this.socket?.close();
     this.socket = null;
+    this.connectionReady = false; // 重置连接状态
+    this.pendingMessages = []; // 清空待处理消息
   }
 }

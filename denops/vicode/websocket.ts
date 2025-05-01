@@ -53,6 +53,23 @@ export class WebSocketManager {
     sockets.delete(socket);
   }
 
+  // 检查是否有活跃的WebSocket连接
+  hasActiveConnections(): boolean {
+    if (sockets.size === 0) {
+      return false;
+    }
+
+    // 检查是否有处于OPEN状态的连接
+    let hasActive = false;
+    sockets.forEach((s) => {
+      if (s.readyState === WebSocket.OPEN) {
+        hasActive = true;
+      }
+    });
+
+    return hasActive;
+  }
+
   broadcast(data: VicodeMessage) {
     // Ensure sender is always 'vim' when broadcasting from Vim
     const messageToSend = { ...data, sender: "vim" };

@@ -158,6 +158,22 @@ export function main(denops: Denops): Promise<void> {
       await stopWsServer();
     },
 
+    // 添加ping方法用于验证服务器是否准备好
+    async ping() {
+      console.log("Vicode: ping method called in dispatcher");
+
+      // 检查是否有活跃的WebSocket连接
+      const hasActiveConnections = wsManager.hasActiveConnections();
+
+      if (hasActiveConnections) {
+        console.log("Vicode: Server is ready with active connections");
+        return { success: true };
+      } else {
+        console.log("Vicode: Server is running but no active connections");
+        return { success: false, error: "No active WebSocket connections" };
+      }
+    },
+
     // 处理关闭buffer的方法
     async closeBuffer(path: unknown): Promise<void> {
       const filePath = ensureString(path);

@@ -134,12 +134,20 @@ function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
 	local denops_loaded = false
 	local denops_attempt = 0
 
+	print("Vicode: Waiting for Denops to load...")
+
 	while not denops_loaded and denops_attempt < max_attempts do
 		denops_attempt = denops_attempt + 1
 		denops_loaded = M.is_denops_loaded()
 
-		if not denops_loaded then
-			-- Use vim.wait for blocking sleep
+		if denops_loaded then
+			print("Vicode: Denops loaded successfully after " .. denops_attempt .. " attempts")
+		elseif denops_attempt % 5 == 0 then -- Log every 5 attempts to avoid spam
+			print(string.format("Vicode: Still waiting for Denops (attempt %d/%d)...", denops_attempt, max_attempts))
+		end
+
+		if not denops_loaded and denops_attempt < max_attempts then
+			-- Use vim.wait for blocking sleep with a positive count value
 			vim.wait(attempt_interval, function()
 				return false
 			end)
@@ -148,16 +156,27 @@ function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
 
 	if not denops_loaded then
 		vim.notify("Vicode: Timed out waiting for Denops to load. Please try again later.", vim.log.levels.ERROR)
+		print("Vicode: You can check Denops status with :checkhealth denops")
 		return nil
 	end
 
+	print("Vicode: Starting WebSocket server...")
 	local result = M.denops_request("start")
 
 	if result and result.success and result.port then
 		M.server.port = result.port -- Update the module's server port
 		M.server.host = M.server.host or config.options.server.host -- Use config host if not set
 		M.server.address = M.server.host .. ":" .. M.server.port -- Update the full address
-		return M.server.port
+
+		-- Verify server is ready by sending a ping
+		local ping_result = M.denops_request("ping")
+		if ping_result and ping_result.success then
+			print("Vicode: Server started and verified on " .. M.server.address)
+			return M.server.port
+		else
+			vim.notify("Vicode: Server started but verification failed. Connection may be unstable.", vim.log.levels.WARN)
+			return M.server.port -- Still return the port, but with a warning
+		end
 	else
 		local error_msg = result and result.error or "Unknown error when starting server"
 		vim.notify("Vicode: Failed to start server: " .. error_msg, vim.log.levels.ERROR)
