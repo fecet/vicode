@@ -1,5 +1,5 @@
 import { Denops } from "jsr:@denops/core@7.0.1/type";
-// 导入 protobuf 生成的类型
+// Import protobuf generated types
 import type {
   VicodeMessage,
   CursorPosPayload,
@@ -8,7 +8,7 @@ import type {
   CloseBufferPayload,
 } from "../gen/vicode_pb.ts";
 
-// 定义同步请求/响应类型
+// Define sync request/response type
 interface CommandRequest {
   id: string;
   command: string;
@@ -26,7 +26,7 @@ import {
 } from "./utils.ts";
 
 
-// 声明 Deno 命名空间，以便 TypeScript 编译器识别
+// Declare Deno namespace for TypeScript compiler
 declare namespace Deno {
   function upgradeWebSocket(req: Request): { socket: WebSocket; response: Response };
   function serve(options: { port: number }, handler: (req: Request) => Response): {
@@ -38,7 +38,7 @@ declare namespace Deno {
 // private field in WebSocketManager is not working
 const sockets = new Set<WebSocket>();
 
-// 存储待处理的命令请求
+// Store pending command requests
 const pendingRequests = new Map<string, CommandRequest>();
 
 export class WebSocketManager {
@@ -53,13 +53,13 @@ export class WebSocketManager {
     sockets.delete(socket);
   }
 
-  // 检查是否有活跃的WebSocket连接
+  // Check if there are active WebSocket connections
   hasActiveConnections(): boolean {
     if (sockets.size === 0) {
       return false;
     }
 
-    // 检查是否有处于OPEN状态的连接
+    // Check if any connections are in OPEN state
     let hasActive = false;
     sockets.forEach((s) => {
       if (s.readyState === WebSocket.OPEN) {
@@ -74,13 +74,13 @@ export class WebSocketManager {
     // Ensure sender is always 'vim' when broadcasting from Vim
     const messageToSend = { ...data, sender: "vim" };
 
-    // 检查是否有可用的socket
+    // Check if any sockets are available
     if (sockets.size === 0) {
       console.warn("Vicode: No connected clients to broadcast to");
       return;
     }
 
-    // 检查每个socket的状态
+    // Check status of each socket
     let activeSockets = 0;
     sockets.forEach((s) => {
       if (s.readyState === WebSocket.OPEN) {
@@ -109,17 +109,17 @@ export class WebSocketManager {
     this.lastCursorPos = pos;
   }
 
-  // 发送命令并等待响应
+  // Send command and wait for response
   async sendCommandAndWaitForResponse(command: string, args: string[], timeout: number): Promise<unknown> {
     if (sockets.size === 0) {
       throw new Error("No connected clients");
     }
 
     return new Promise((resolve, reject) => {
-      // 生成唯一请求ID
+      // Generate unique request ID
       const requestId = crypto.randomUUID();
 
-      // 创建命令执行消息，包含请求ID
+      // Create command execution message with request ID
       const message: VicodeMessage = {
         sender: "vim",
         payload: {
@@ -132,7 +132,7 @@ export class WebSocketManager {
         }
       };
 
-      // 设置超时处理
+      // Set timeout handler
       const timer = setTimeout(() => {
         if (pendingRequests.has(requestId)) {
           pendingRequests.delete(requestId);
@@ -140,22 +140,22 @@ export class WebSocketManager {
         }
       }, timeout);
 
-      // 存储请求信息
+      // Store request information
       pendingRequests.set(requestId, {
         id: requestId,
         command,
         args,
         resolve,
         reject,
-        timer: timer as unknown as number, // 类型转换以解决TypeScript错误
+        timer: timer as unknown as number, // Type cast to resolve TypeScript error
       });
 
-      // 发送请求
+      // Send request
       this.broadcast(message);
     });
   }
 
-  // 处理命令响应
+  // Handle command response
   handleCommandResponse(requestId: string, result: unknown, isError: boolean): void {
     const request = pendingRequests.get(requestId);
     if (!request) {
@@ -163,15 +163,15 @@ export class WebSocketManager {
       return;
     }
 
-    // 清除超时计时器
+    // Clear timeout timer
     if (request.timer !== null) {
       clearTimeout(request.timer);
     }
 
-    // 从待处理请求中移除
+    // Remove from pending requests
     pendingRequests.delete(requestId);
 
-    // 调用相应的回调
+    // Call appropriate callback
     if (isError) {
       request.reject(result);
     } else {
@@ -233,7 +233,7 @@ export class WebSocketManager {
   }
 }
 
-// 定义 Deno 服务器类型
+// Define Deno server type
 type DenoHttpServer = {
   addr: { port: number };
   shutdown(): Promise<void>;
@@ -254,7 +254,7 @@ export async function stopWsServer() {
 const wsManager = new WebSocketManager();
 console.log("initialize wsmanager");
 
-// 定义请求和响应类型
+// Define request and response types
 type WebSocketRequest = {
   headers: {
     get(name: string): string | null;
@@ -268,14 +268,14 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
     return new Response("not trying to upgrade as websocket.");
   }
 
-  // 使用 Deno 的 upgradeWebSocket 函数
+  // Use Deno's upgradeWebSocket function
   const { socket, response } = Deno.upgradeWebSocket(req as Request);
   wsManager.addSocket(socket);
 
   socket.onopen = () => {
     console.log("Vicode: Client connected");
 
-    // 发送一个ping消息，确保连接正常
+    // Send a ping message to ensure connection is working
     try {
       const pingMessage: VicodeMessage = {
         sender: "vim",
@@ -300,22 +300,22 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
   };
 
   socket.onmessage = async (e: MessageEvent) => {
-    // 解析消息并处理已知类型
+    // Parse message and handle known types
     try {
       const msg = JSON.parse(e.data as string) as VicodeMessage;
 
-      // 只处理来自 vscode 的消息
+      // Only process messages from vscode
       if (msg.sender === "vscode") {
         if (msg.payload.case === "cursorPos" && msg.payload.value) {
           await wsManager.handleCursorPosMessage(denops, msg.payload.value);
         }
 
         else if (msg.payload.case === "selectionPos") {
-          // Vim 当前不处理来自 VSCode 的 SelectionPos，但记录它
+          // Vim currently doesn't handle SelectionPos from VSCode, but log it
           console.log("Vicode: Received SelectionPos (ignored)");
         }
         else if (msg.payload.case === "executeCommand" && msg.payload.value) {
-          // 检查是否是命令响应
+          // Check if it's a command response
           if (msg.payload.value.requestId) {
             console.log(`Vicode: Received command response for request: ${msg.payload.value.requestId}`);
             wsManager.handleCommandResponse(
@@ -324,7 +324,7 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
               msg.payload.value.isError || false
             );
           }
-          // 检查是否是回调响应
+          // Check if it's a callback response
           else if (msg.payload.value.callbackId) {
             console.log(`Vicode: Received command result for callback: ${msg.payload.value.callbackId}`);
             await denops.dispatch(
@@ -337,15 +337,15 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
               }
             );
           }
-          // 普通命令（不处理）
+          // Regular command (not handled)
           else {
             console.log(`Vicode: Received ExecuteCommand: ${msg.payload.value.command} (ignored)`);
           }
         }
         else if (msg.payload.case === "closeBuffer" && msg.payload.value) {
-          // 暂时注释掉处理来自VSCode的关闭buffer请求的代码
+          // Temporarily commented out code for handling CloseBuffer requests from VSCode
           console.log(`Vicode: Received CloseBuffer request for path: ${msg.payload.value.path} (ignored)`);
-          // 以下代码被注释掉，因为我们暂时只需要Neovim到VSCode的单向同步
+          // Code below is commented out because we only need one-way sync from Neovim to VSCode for now
           // await denops.dispatch("vicode", "closeBufferFromVSCode", msg.payload.value.path);
         }
         else {
@@ -361,7 +361,7 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
     console.error("Vicode error:", e);
     wsManager.removeSocket(socket);
 
-    // 记录错误，但不尝试重新连接，因为客户端会自动重连
+    // Log error but don't try to reconnect, as client will auto-reconnect
     console.log("Vicode: WebSocket error occurred, client will reconnect automatically");
   };
   return response;
@@ -370,7 +370,7 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
 export async function runWsServer(denops: Denops) {
   console.log("Vicode: Starting WebSocket server...");
 
-  // 关闭现有服务器（如果存在）
+  // Close existing server if any
   if (currentServer) {
     console.log("Vicode: Closing existing server");
     await currentServer.shutdown();
@@ -378,7 +378,7 @@ export async function runWsServer(denops: Denops) {
   }
 
   try {
-    // 使用 Deno.serve 启动服务器
+    // Start server using Deno.serve
     console.log("Vicode: Creating new WebSocket server...");
     const server = Deno.serve({ port: 0 }, (req: Request) => handleWs(denops, req));
     currentServer = server as unknown as DenoHttpServer;

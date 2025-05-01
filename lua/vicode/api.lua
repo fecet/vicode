@@ -3,20 +3,20 @@ local M = {}
 -- Load config module
 local config = require("vicode.config")
 
--- 存储请求状态
+-- Request state storage
 local REQUEST_STATE = {
   id = 0,
   callbacks = {},
 }
 
--- 添加回调函数并返回ID
+-- Add callback function and return ID
 local function add_callback(callback)
   REQUEST_STATE.id = REQUEST_STATE.id + 1
   REQUEST_STATE.callbacks[REQUEST_STATE.id] = callback
   return REQUEST_STATE.id
 end
 
--- 调用回调函数，由VSCode响应触发
+-- Invoke callback function triggered by VSCode response
 function M.invoke_callback(id, result, is_error)
   vim.schedule(function()
     local callback = REQUEST_STATE.callbacks[id]
@@ -31,14 +31,14 @@ function M.invoke_callback(id, result, is_error)
   end)
 end
 
---- 异步执行VSCode命令
----@param name string 命令名称，通常是VSCode命令ID
----@param opts? table 可选参数表，所有字段都是可选的
---- - args: (table) 命令的可选参数
+--- Execute VSCode command asynchronously
+---@param name string Command name, typically a VSCode command ID
+---@param opts? table Optional parameters table, all fields are optional
+--- - args: (table) Optional command arguments
 --- - callback: (function(err: string|nil, ret: any))
----   可选的回调函数处理命令结果。
----   第一个参数是错误消息，第二个是结果。
----   如果没有提供回调，任何错误消息都会在VSCode中显示为通知。
+---   Optional callback function to handle command result.
+---   First parameter is error message, second is result.
+---   If no callback is provided, any error messages will be shown as notifications in VSCode.
 function M.action(name, opts)
   opts = opts or {}
 
@@ -61,10 +61,10 @@ function M.action(name, opts)
     callback_id = add_callback(opts.callback)
   end
 
-  -- 使用vicode模块发送命令
+  -- Use vicode module to send command
   local vicode = require("vicode")
 
-  -- 检查denops是否已加载
+  -- Check if denops is loaded
   if not vicode.is_denops_loaded() then
     local error_msg = "Vicode: Denops is not loaded yet, cannot execute command"
     vim.notify(error_msg, vim.log.levels.ERROR)
@@ -74,15 +74,14 @@ function M.action(name, opts)
     return
   end
 
-  -- 创建参数数组，而不是对象
+  -- Create parameters array instead of object
   local params = {
     name,
     opts.args or {},
     callback_id
   }
 
-
-  -- 发送命令
+  -- Send command
   local success = vicode.denops_notify("executeVSCodeCommandAsync", params)
 
   if not success and opts.callback then
@@ -92,13 +91,13 @@ function M.action(name, opts)
   end
 end
 
---- 同步执行VSCode命令
----@param name string 命令名称，通常是VSCode命令ID
----@param opts? table 可选参数表，所有字段都是可选的
---- - args: (table) 命令的可选参数
----@param timeout? number 超时时间（毫秒）。默认值为5000（5秒）。
+--- Execute VSCode command synchronously
+---@param name string Command name, typically a VSCode command ID
+---@param opts? table Optional parameters table
+--- - args: (table) Optional command arguments
+---@param timeout? number Timeout in milliseconds. Default is 5000 (5 seconds).
 ---
----@return any: 命令执行结果
+---@return any Command execution result
 function M.call(name, opts, timeout)
   opts = opts or {}
   timeout = timeout or config.options.command.default_timeout
@@ -117,25 +116,24 @@ function M.call(name, opts, timeout)
     opts.args = { opts.args }
   end
 
-  -- 使用vicode模块发送同步请求
+  -- Use vicode module to send sync request
   local vicode = require("vicode")
 
-  -- 检查denops是否已加载
+  -- Check if denops is loaded
   if not vicode.is_denops_loaded() then
     local error_msg = "Vicode: Denops is not loaded yet, cannot execute command"
     vim.notify(error_msg, vim.log.levels.ERROR)
     error(error_msg)
   end
 
-
-  -- 创建参数数组，而不是对象
+  -- Create parameters array
   local params = {
     name,
     opts.args or {},
     timeout
   }
 
-  -- 发送同步请求
+  -- Send synchronous request
   local status, result = pcall(function()
     return vicode.denops_request("executeVSCodeCommandSync", params)
   end)
@@ -165,13 +163,13 @@ function M.call(name, opts, timeout)
   end
 end
 
---- 在VSCode中执行JavaScript代码并返回结果
----@param code string 要执行的JavaScript代码
----@param opts? table 可选参数表，所有字段都是可选的
---- - args: (any) 可选参数，可在JavaScript代码中通过args变量访问
----@param timeout? number 超时时间（毫秒）。默认值为5000（5秒）。
+--- Execute JavaScript code in VSCode and return result
+---@param code string JavaScript code to execute
+---@param opts? table Optional parameters table
+--- - args: (any) Optional arguments accessible in JavaScript code via args variable
+---@param timeout? number Timeout in milliseconds. Default is 5000 (5 seconds).
 ---
----@return any: 执行JavaScript代码的结果
+---@return any JavaScript execution result
 function M.eval(code, opts, timeout)
   vim.validate({
     code = { code, "string" },
@@ -185,12 +183,12 @@ function M.eval(code, opts, timeout)
   return M.call("eval", opts, timeout)
 end
 
---- 异步执行JavaScript代码
----@param code string 要执行的JavaScript代码
----@param opts? table 可选参数表，所有字段都是可选的
---- - args: (any) 可选参数，可在JavaScript代码中通过args变量访问
+--- Execute JavaScript code asynchronously
+---@param code string JavaScript code to execute
+---@param opts? table Optional parameters table
+--- - args: (any) Optional arguments accessible in JavaScript code via args variable
 --- - callback: (function(err: string|nil, ret: any))
----   可选的回调函数处理执行结果。
+---   Optional callback function to handle execution result
 function M.eval_async(code, opts)
   vim.validate({
     code = { code, "string" },

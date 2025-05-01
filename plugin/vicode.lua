@@ -74,17 +74,17 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 
 	print("Vicode: Server started successfully on " .. tostring(vicode.server.address))
 
-	-- 等待一小段时间确保服务器完全准备好
+	-- Wait a moment to ensure server is fully ready
 	print("Vicode: Waiting for server to be fully ready...")
 	vim.wait(500, function() return false end)
 
-	-- 获取当前文件的git根目录
+	-- Get git root directory of current file
 	local result = vim.fn.system(
 		"git -C " .. vim.fn.shellescape(vim.fn.expand("%:p:h")) .. " rev-parse --show-toplevel 2>/dev/null"
 	)
 	local git_root = vim.v.shell_error ~= 0 and nil or result:gsub("\n", "")
 
-	-- 准备VSCode启动参数
+	-- Prepare VSCode launch arguments
 	local cursor_args = { config.options.vscode.executable }
 
 	if config.options.vscode.force_new then
@@ -100,15 +100,15 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 	table.insert(cursor_args, "-g")
 	table.insert(cursor_args, string.format("%s:%s:%s", vim.fn.expand("%:p"), vim.fn.line("."), vim.fn.col(".")))
 
-	-- 设置环境变量，确保VSCode自动连接
+	-- Set environment variables to ensure VSCode auto-connects
 	local env = {
 		VICODE_ADDRESS = vicode.server.address,
-		VICODE_AUTOCONNECT = "1"  -- 确保自动连接
+		VICODE_AUTOCONNECT = "1"  -- Ensure auto-connection
 	}
 
 	print("Vicode: Launching VSCode with connection address: " .. vicode.server.address)
 
-	-- 启动VSCode
+	-- Launch VSCode
 	vim.system(cursor_args, {
 		detach = false,
 		env = env,

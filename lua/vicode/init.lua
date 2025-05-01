@@ -6,7 +6,7 @@ local is_loaded_cache = nil
 -- Load config module
 local config = require("vicode.config")
 
--- Store server information (will be updated from config in setup)
+-- Server information (updated from config in setup)
 M.server = {
 	port = nil,
 	host = nil,
@@ -73,15 +73,10 @@ function M.execute_vscode_command(command, args)
 	M.denops_notify("executeVSCodeCommand", { command, args })
 end
 
--- Setup function to initialize the plugin with user configuration
--- This is the main entry point for lazy.nvim
+-- Initialize plugin with user configuration (main entry point for lazy.nvim)
 function M.setup(opts)
-	-- Initialize configuration
 	local options = config.setup(opts)
-
-	-- Update server information from config
 	M.server.host = options.server.host
-
 	return M
 end
 
@@ -122,8 +117,8 @@ function M.wait_for_denops_and_notify(method, max_attempts, attempt_interval)
 	wait_and_notify()
 end
 
--- Start the WebSocket server and get the port number (blocking version)
--- This function blocks until the server is started and port is obtained
+-- Start WebSocket server and get port number (blocking version)
+-- Blocks until server is started and port is obtained
 -- Returns: port number on success, nil on failure
 function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
 	-- Use config values if not provided
@@ -164,9 +159,9 @@ function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
 	local result = M.denops_request("start")
 
 	if result and result.success and result.port then
-		M.server.port = result.port -- Update the module's server port
+		M.server.port = result.port -- Update server port
 		M.server.host = M.server.host or config.options.server.host -- Use config host if not set
-		M.server.address = M.server.host .. ":" .. M.server.port -- Update the full address
+		M.server.address = M.server.host .. ":" .. M.server.port -- Update full address
 
 		-- Verify server is ready by sending a ping
 		local ping_result = M.denops_request("ping")

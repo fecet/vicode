@@ -9,7 +9,7 @@ import {
   getCurrentLine,
   getCurrentPath,
 } from "./utils.ts";
-// 导入 protobuf 生成的类型
+// Import protobuf generated types
 import type {
   VicodeMessage,
   CursorPosPayload,
@@ -27,7 +27,7 @@ export function main(denops: Denops): Promise<void> {
       const colNum = ensureNumber(col);
       const path = ensureString(await denops.call("expand", "%:p"));
 
-      // 创建光标位置消息
+      // Create cursor position message
       const message: VicodeMessage = {
         sender: "vim",
         payload: {
@@ -41,7 +41,7 @@ export function main(denops: Denops): Promise<void> {
       };
       wsManager.broadcast(message);
     },
-    50, // 防抖时间保持不变
+    50, // Debounce time in ms
   );
 
   denops.dispatcher = {
@@ -74,7 +74,7 @@ export function main(denops: Denops): Promise<void> {
       endLine: unknown,
       endCol: unknown,
     ): Promise<void> {
-      // 创建选择位置消息
+      // Create selection position message
       const message: VicodeMessage = {
         sender: "vim",
         payload: {
@@ -92,21 +92,21 @@ export function main(denops: Denops): Promise<void> {
       return Promise.resolve();
     },
 
-    // 执行 VSCode 命令的方法
+    // Execute VSCode command method
     async executeVSCodeCommand(
       command: unknown,
       args?: unknown,
     ): Promise<void> {
       const commandStr = ensureString(command);
-      // 确保参数是字符串数组，符合 protobuf 类型要求
+      // Ensure args are string array to match protobuf type requirements
       let commandArgs: string[] = [];
 
       if (args !== undefined && args !== null) {
         if (Array.isArray(args)) {
-          // 确保数组中的所有元素都是字符串
+          // Ensure all array elements are strings
           commandArgs = args.map(arg => String(arg));
         } else {
-          // 将单个非数组参数包装为字符串数组
+          // Wrap single non-array argument as string array
           commandArgs = [String(args)];
         }
       }
@@ -115,7 +115,7 @@ export function main(denops: Denops): Promise<void> {
         `Vicode: Sending command '${commandStr}' with args: ${JSON.stringify(commandArgs)}`,
       );
 
-      // 创建命令执行消息
+      // Create command execution message
       const message: VicodeMessage = {
         sender: "vim",
         payload: {
@@ -133,14 +133,14 @@ export function main(denops: Denops): Promise<void> {
     async start() {
       console.log("Vicode: start method called in dispatcher");
       try {
-        // 添加超时处理
+        // Add timeout handling
         const timeoutPromise = new Promise<never>((_, reject) => {
           setTimeout(() => {
             reject(new Error("Vicode: WebSocket server start timed out"));
-          }, 10000); // 10秒超时
+          }, 10000); // 10 second timeout
         });
 
-        // 竞争条件：哪个先完成就返回哪个结果
+        // Race condition: return result of whichever completes first
         const port = await Promise.race([
           runWsServer(denops),
           timeoutPromise
@@ -158,11 +158,11 @@ export function main(denops: Denops): Promise<void> {
       await stopWsServer();
     },
 
-    // 添加ping方法用于验证服务器是否准备好
+    // Add ping method to verify server is ready
     async ping() {
       console.log("Vicode: ping method called in dispatcher");
 
-      // 检查是否有活跃的WebSocket连接
+      // Check if there are active WebSocket connections
       const hasActiveConnections = wsManager.hasActiveConnections();
 
       if (hasActiveConnections) {
@@ -174,12 +174,12 @@ export function main(denops: Denops): Promise<void> {
       }
     },
 
-    // 处理关闭buffer的方法
+    // Handle buffer close method
     async closeBuffer(path: unknown): Promise<void> {
       const filePath = ensureString(path);
       console.log(`Vicode: Sending close buffer message for path: ${filePath}`);
 
-      // 创建关闭buffer消息
+      // Create close buffer message
       const message: VicodeMessage = {
         sender: "vim",
         payload: {
@@ -193,21 +193,21 @@ export function main(denops: Denops): Promise<void> {
       return Promise.resolve();
     },
 
-    // 处理来自VSCode的关闭buffer请求 (暂时注释掉)
+    // Handle close buffer request from VSCode (temporarily disabled)
     async closeBufferFromVSCode(path: unknown): Promise<void> {
       const filePath = ensureString(path);
       console.log(`Vicode: Received request to close buffer for path: ${filePath} (function disabled)`);
       return Promise.resolve();
     },
 
-    // 异步执行VSCode命令并支持回调
+    // Execute VSCode command asynchronously with callback support
     async executeVSCodeCommandAsync(
       command: unknown,
       args: unknown,
       callback_id: unknown
     ): Promise<void> {
       const commandStr = ensureString(command);
-      // 确保参数是字符串数组
+      // Ensure args are string array
       let commandArgs: string[] = [];
 
       if (args !== undefined && args !== null) {
@@ -222,7 +222,7 @@ export function main(denops: Denops): Promise<void> {
         `Vicode: Sending async command '${commandStr}' with args: ${JSON.stringify(commandArgs)} and callback_id: ${callback_id}`,
       );
 
-      // 创建命令执行消息，包含回调ID
+      // Create command execution message with callback ID
       const message: VicodeMessage = {
         sender: "vim",
         payload: {
@@ -238,7 +238,7 @@ export function main(denops: Denops): Promise<void> {
       return Promise.resolve();
     },
 
-    // 同步执行VSCode命令
+    // Execute VSCode command synchronously
     async executeVSCodeCommandSync(
       command: unknown,
       args: unknown,
@@ -247,7 +247,7 @@ export function main(denops: Denops): Promise<void> {
       const commandStr = ensureString(command);
       const timeoutMs = ensureNumber(timeout || 5000);
 
-      // 确保参数是字符串数组
+      // Ensure args are string array
       let commandArgs: string[] = [];
 
       if (args !== undefined && args !== null) {
@@ -263,7 +263,7 @@ export function main(denops: Denops): Promise<void> {
       );
 
       try {
-        // 使用WebSocket管理器发送同步请求
+        // Use WebSocket manager to send synchronous request
         const result = await wsManager.sendCommandAndWaitForResponse(commandStr, commandArgs, timeoutMs);
         return { success: true, data: result };
       } catch (error) {
@@ -272,14 +272,14 @@ export function main(denops: Denops): Promise<void> {
       }
     },
 
-    // 处理来自VSCode的命令执行结果回调
+    // Handle command execution result callback from VSCode
     async handleCommandResult(params: unknown): Promise<void> {
       const { callback_id, result, is_error } = ensureObject(params);
       const id = ensureNumber(callback_id);
 
       console.log(`Vicode: Received command result for callback_id: ${id}, is_error: ${is_error}`);
 
-      // 调用Lua回调函数
+      // Call Lua callback function
       await denops.call("luaeval", "require('vicode.api').invoke_callback(_A[1], _A[2], _A[3])", [id, result, is_error]);
 
       return Promise.resolve();
