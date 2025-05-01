@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { WebSocket, MessageEvent } from "ws";
 import {
   VicodeMessage,
-  TextContentPayload,
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,
@@ -11,7 +10,6 @@ import {
 import {
   setCursorPosition,
   selectRange,
-  replaceFileContent,
   isFocused,
 } from "../utils/editor";
 import {
@@ -128,10 +126,7 @@ export class WebSocketHandler {
     const editor = vscode.window.activeTextEditor;
 
     // Check which payload type is set
-    if (message.payload.case === "textContent" && message.payload.value && editor) {
-      await this.handleTextContent(message.payload.value, editor);
-    }
-    else if (message.payload.case === "cursorPos" && message.payload.value && editor) {
+    if (message.payload.case === "cursorPos" && message.payload.value && editor) {
       await this.handleCursorPos(message.sender, message.payload.value, editor);
     }
     else if (message.payload.case === "selectionPos" && message.payload.value && editor) {
@@ -142,16 +137,6 @@ export class WebSocketHandler {
     }
     else if (message.payload.case === "closeBuffer" && message.payload.value) {
       await this.handleCloseBuffer(message.payload.value);
-    }
-  }
-
-  private async handleTextContent(
-    payload: TextContentPayload,
-    editor: vscode.TextEditor,
-  ): Promise<void> {
-    if (payload.path === editor.document.uri.fsPath) {
-      replaceFileContent(payload.text);
-      setCursorPosition(payload.cursorLine, payload.cursorCol);
     }
   }
 

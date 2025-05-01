@@ -2,7 +2,6 @@ import { Denops } from "jsr:@denops/core@7.0.1/type";
 // 导入 protobuf 生成的类型
 import type {
   VicodeMessage,
-  TextContentPayload,
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,
@@ -297,10 +296,7 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
         if (msg.payload.case === "cursorPos" && msg.payload.value) {
           await wsManager.handleCursorPosMessage(denops, msg.payload.value);
         }
-        else if (msg.payload.case === "textContent") {
-          // Vim 当前不处理来自 VSCode 的 TextContent，但记录它
-          console.log("Vicode: Received TextContent (ignored)");
-        }
+
         else if (msg.payload.case === "selectionPos") {
           // Vim 当前不处理来自 VSCode 的 SelectionPos，但记录它
           console.log("Vicode: Received SelectionPos (ignored)");

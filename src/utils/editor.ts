@@ -67,18 +67,3 @@ export function getFilePath(): string {
   }
   return editor.document.uri.fsPath;
 }
-
-export function replaceFileContent(newContent: string): void {
-  const editor = vscode.window.activeTextEditor;
-  if (editor) {
-    const document = editor.document;
-    const fullRange = new vscode.Range(
-      document.positionAt(0),
-      document.positionAt(document.getText().length),
-    );
-
-    editor.edit((editBuilder) => {
-      editBuilder.replace(fullRange, newContent);
-    });
-  }
-}

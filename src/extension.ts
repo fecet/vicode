@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { WebSocketHandler } from "./websocket/handler";
 import {
   VicodeMessage,
-  TextContentPayload,
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,

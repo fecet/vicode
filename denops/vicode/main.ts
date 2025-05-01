@@ -8,12 +8,10 @@ import {
   getCurrentCol,
   getCurrentLine,
   getCurrentPath,
-  getCurrentText,
 } from "./utils.ts";
 // 导入 protobuf 生成的类型
 import type {
   VicodeMessage,
-  TextContentPayload,
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,
@@ -47,29 +45,6 @@ export function main(denops: Denops): Promise<void> {
   );
 
   denops.dispatcher = {
-    async syncText(): Promise<void> {
-      const currentBuffer = await getCurrentPath(denops);
-      const line = await getCurrentLine(denops);
-      const col = await getCurrentCol(denops);
-
-      // 创建文本内容消息
-      const message: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "textContent",
-          value: {
-            path: currentBuffer,
-            text: await getCurrentText(denops),
-            cursorLine: line,
-            cursorCol: col,
-          }
-        }
-      };
-
-      wsManager.broadcast(message);
-      return Promise.resolve();
-    },
-
     syncCursorPos: async () => {
       const lineNum = await getCurrentLine(denops);
       const colNum = await getCurrentCol(denops);
