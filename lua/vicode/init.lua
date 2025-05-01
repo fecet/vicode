@@ -3,10 +3,13 @@ local M = {}
 local plugin_name = "vicode"
 local is_loaded_cache = nil
 
--- Store server information
+-- Load config module
+local config = require("vicode.config")
+
+-- Store server information (will be updated from config in setup)
 M.server = {
 	port = nil,
-	host = "localhost",
+	host = nil,
 	address = nil,
 }
 
@@ -70,7 +73,23 @@ function M.execute_vscode_command(command, args)
 	M.denops_notify("executeVSCodeCommand", { command, args })
 end
 
+-- Setup function to initialize the plugin with user configuration
+-- This is the main entry point for lazy.nvim
+function M.setup(opts)
+	-- Initialize configuration
+	local options = config.setup(opts)
+
+	-- Update server information from config
+	M.server.host = options.server.host
+
+	return M
+end
+
 function M.wait_for_denops_and_notify(method, max_attempts, attempt_interval)
+	-- Use config values if not provided
+	max_attempts = max_attempts or config.options.connection.max_attempts
+	attempt_interval = attempt_interval or config.options.connection.attempt_interval
+
 	local current_attempt = 0
 
 	local function wait_and_notify()
@@ -87,7 +106,7 @@ function M.wait_for_denops_and_notify(method, max_attempts, attempt_interval)
 						current_attempt,
 						max_attempts
 					),
-					vim.log.levels.DEBUG
+					config.options.debug.log_level
 				)
 				vim.defer_fn(wait_and_notify, attempt_interval)
 			else
@@ -107,6 +126,10 @@ end
 -- This function blocks until the server is started and port is obtained
 -- Returns: port number on success, nil on failure
 function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
+	-- Use config values if not provided
+	max_attempts = max_attempts or config.options.connection.max_attempts
+	attempt_interval = attempt_interval or config.options.connection.attempt_interval
+
 	-- Wait for denops to load first
 	local denops_loaded = false
 	local denops_attempt = 0
@@ -132,6 +155,7 @@ function M.start_server_and_get_port_blocking(max_attempts, attempt_interval)
 
 	if result and result.success and result.port then
 		M.server.port = result.port -- Update the module's server port
+		M.server.host = M.server.host or config.options.server.host -- Use config host if not set
 		M.server.address = M.server.host .. ":" .. M.server.port -- Update the full address
 		return M.server.port
 	else

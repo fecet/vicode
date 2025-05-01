@@ -3,7 +3,16 @@ if vim.g.loaded_vicode then
 end
 vim.g.loaded_vicode = 1
 
-local denops_notify = require("vicode").denops_notify
+-- Load vicode module and config
+local vicode = require("vicode")
+local config = require("vicode.config")
+
+-- Initialize with default config if not already initialized
+if vim.tbl_isempty(config.options) then
+	config.setup({})
+end
+
+local denops_notify = vicode.denops_notify
 local augroup_name = "Vicode" -- Define augroup name globally
 
 local function sync_cursor_position()
@@ -53,10 +62,8 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 		callback = notify_buffer_close,
 	})
 
-	local vicode = require("vicode")
-
 	-- Use the blocking version to ensure server is started before proceeding
-	local port = vicode.start_server_and_get_port_blocking(10, 500)
+	local port = vicode.start_server_and_get_port_blocking()
 
 	-- Check if server started successfully
 	if not port then
@@ -66,16 +73,14 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 
 	print("Vicode: Server started successfully on " .. tostring(vicode.server.address))
 
-	local force_new = true
-
 	local result = vim.fn.system(
 		"git -C " .. vim.fn.shellescape(vim.fn.expand("%:p:h")) .. " rev-parse --show-toplevel 2>/dev/null"
 	)
 	local git_root = vim.v.shell_error ~= 0 and nil or result:gsub("\n", "")
 
-	local cursor_args = { "code-insiders" }
+	local cursor_args = { config.options.vscode.executable }
 
-	if force_new then
+	if config.options.vscode.force_new then
 		table.insert(cursor_args, "-n")
 	elseif git_root then
 		table.insert(cursor_args, "-r")
@@ -94,11 +99,10 @@ end, {})
 
 vim.api.nvim_create_user_command("VicodeStop", function()
 	print("Vicode: Stopping WebSocket server and removing autocommands...")
-	local vicode = require("vicode")
 	vicode.wait_for_denops_and_notify(
 		"stop",
-		5, -- max_attempts
-		300 -- attempt_interval (ms)
+		config.options.connection.max_attempts,
+		config.options.connection.attempt_interval
 	)
 	-- Remove autocommands here
 	vim.api.nvim_clear_autocmds({ group = augroup_name })
