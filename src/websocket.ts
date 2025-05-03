@@ -6,23 +6,20 @@ import {
   SelectionPosPayload,
   ExecuteCommandPayload,
   CloseBufferPayload
-} from "../../gen/vicode_pb";
+} from "../gen/vicode_pb";
 import {
   setCursorPosition,
   selectRange,
   isFocused,
-} from "../utils/editor";
-import {
   lastCursorPosition,
   updateLastCursorPosition,
-} from "../utils/sharedState";
-
+} from "./utils";
 
 export class WebSocketHandler {
   private socket: WebSocket | null = null;
   private outputChannel: vscode.OutputChannel;
-  private connectionReady: boolean = false; // 新增连接就绪标志
-  private pendingMessages: VicodeMessage[] = []; // 存储连接建立前的消息
+  private connectionReady: boolean = false;
+  private pendingMessages: VicodeMessage[] = [];
 
   constructor(outputChannel: vscode.OutputChannel) {
     this.outputChannel = outputChannel;
@@ -80,81 +77,81 @@ export class WebSocketHandler {
 
     this.outputChannel.appendLine(`Connecting to server from environment: ${serverAddress}`);
 
-    // 添加重试逻辑
+    // Add retry logic
     let retryCount = 0;
     const connectWithRetry = () => {
       this.outputChannel.appendLine(`Connection attempt ${retryCount + 1}/${maxRetries + 1}`);
 
       this.socket = new WebSocket(`ws://${serverAddress}`);
 
-      // 设置连接超时
+      // Set connection timeout
       const connectionTimeout = setTimeout(() => {
         if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
           this.outputChannel.appendLine(`Connection attempt ${retryCount + 1} timed out`);
           this.socket.close();
           retryOrFail();
         }
-      }, 5000); // 5秒连接超时
+      }, 5000); // 5 second connection timeout
 
-      // 设置错误处理
+      // Set error handler
       this.socket.onerror = (error) => {
         clearTimeout(connectionTimeout);
         this.outputChannel.appendLine(`Connection error on attempt ${retryCount + 1}: ${error}`);
         retryOrFail();
       };
 
-      // 设置连接成功处理
+      // Set connection success handler
       this.socket.onopen = () => {
         clearTimeout(connectionTimeout);
         this.outputChannel.appendLine(`Connected to server on attempt ${retryCount + 1}`);
         vscode.window.showInformationMessage(`Connected to WebSocket server`);
         this.setupSocketListeners();
 
-        // 设置连接就绪状态
+        // Set connection ready state
         this.connectionReady = true;
         this.outputChannel.appendLine("Connection marked as ready");
 
-        // 发送所有待处理的消息
+        // Send all pending messages
         if (this.pendingMessages.length > 0) {
           this.outputChannel.appendLine(`Sending ${this.pendingMessages.length} queued messages`);
 
-          // 只发送最新的光标位置消息，避免发送过多历史位置
+          // Only send the latest cursor position message to avoid sending too many historical positions
           const cursorPosMessages = this.pendingMessages.filter(m => m.payload.case === "cursorPos");
           const selectionPosMessages = this.pendingMessages.filter(m => m.payload.case === "selectionPos");
 
-          // 如果有光标位置消息，只发送最后一条
+          // If there are cursor position messages, only send the last one
           if (cursorPosMessages.length > 0) {
             const latestCursorPos = cursorPosMessages[cursorPosMessages.length - 1];
             this.outputChannel.appendLine(`Sending latest cursor position message (discarding ${cursorPosMessages.length - 1} older ones)`);
             this.socket?.send(JSON.stringify(latestCursorPos));
           }
 
-          // 如果有选择位置消息，只发送最后一条
+          // If there are selection position messages, only send the last one
           if (selectionPosMessages.length > 0) {
             const latestSelectionPos = selectionPosMessages[selectionPosMessages.length - 1];
             this.outputChannel.appendLine(`Sending latest selection position message (discarding ${selectionPosMessages.length - 1} older ones)`);
             this.socket?.send(JSON.stringify(latestSelectionPos));
           }
 
-          // 清空待处理消息队列
+          // Clear pending message queue
           this.pendingMessages = [];
         }
       };
 
-      // 设置关闭处理
+      // Set close handler
       this.socket.onclose = (event) => {
         clearTimeout(connectionTimeout);
 
-        // 重置连接状态
+        // Reset connection state
         this.connectionReady = false;
 
-        // 记录详细的关闭信息
+        // Log detailed close information
         this.outputChannel.appendLine(`Connection closed on attempt ${retryCount + 1}:`);
         this.outputChannel.appendLine(`- Close code: ${event.code}`);
         this.outputChannel.appendLine(`- Close reason: ${event.reason || "No reason provided"}`);
         this.outputChannel.appendLine(`- Was clean: ${event.wasClean ? "Yes" : "No"}`);
 
-        // 根据关闭代码提供诊断信息
+        // Provide diagnostic information based on close code
         if (event.code === 1000) {
           this.outputChannel.appendLine("- Diagnosis: Normal closure, connection successfully completed");
         } else if (event.code === 1001) {
@@ -165,14 +162,14 @@ export class WebSocketHandler {
           this.outputChannel.appendLine("- Diagnosis: Server error, server encountered an unexpected condition");
         }
 
-        // 只有在初始连接阶段才重试，避免正常关闭时也重试
-        // 如果是正常关闭(1000)或服务器关闭(1001)，则不重试
+        // Only retry during initial connection phase, avoid retrying on normal closure
+        // If it's a normal close (1000) or server shutdown (1001), don't retry
         if (retryCount < maxRetries && !this.isConnected() && event.code !== 1000 && event.code !== 1001) {
           this.outputChannel.appendLine("- Action: Will retry connection");
           retryOrFail();
         } else {
           this.outputChannel.appendLine("- Action: Will not retry connection");
-          // 如果不再重试，清空待处理消息队列
+          // If no more retries, clear pending message queue
           if (this.pendingMessages.length > 0) {
             this.outputChannel.appendLine(`- Discarding ${this.pendingMessages.length} queued messages`);
             this.pendingMessages = [];
@@ -181,7 +178,7 @@ export class WebSocketHandler {
       };
     };
 
-    // 重试或失败处理
+    // Retry or fail handler
     const retryOrFail = () => {
       if (retryCount < maxRetries) {
         retryCount++;
@@ -194,11 +191,11 @@ export class WebSocketHandler {
       }
     };
 
-    // 开始第一次连接尝试
+    // Start first connection attempt
     connectWithRetry();
   }
 
-  // 检查是否已连接
+  // Check if connected
   private isConnected(): boolean {
     return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
   }
@@ -206,8 +203,8 @@ export class WebSocketHandler {
   public disconnect(): void {
     this.socket?.close();
     this.socket = null;
-    this.connectionReady = false; // 重置连接状态
-    this.pendingMessages = []; // 清空待处理消息
+    this.connectionReady = false; // Reset connection state
+    this.pendingMessages = []; // Clear pending messages
     vscode.window.showInformationMessage(`Disconnected from WebSocket server`);
   }
 
@@ -216,7 +213,7 @@ export class WebSocketHandler {
       return;
     }
 
-    // 只添加消息处理程序，其他事件处理程序已在connect方法中设置
+    // Only add message handler, other event handlers are set in connect method
     this.socket.addEventListener("message", this.handleMessage.bind(this));
 
     this.outputChannel.appendLine("Socket listeners set up");
@@ -297,20 +294,20 @@ export class WebSocketHandler {
     }
   }
 
-  // 处理 ExecuteCommand 消息的方法
+  // Handle ExecuteCommand message
   private async handleExecuteCommand(payload: ExecuteCommandPayload): Promise<void> {
     try {
-      // 处理ping命令
+      // Handle ping command
       if (payload.command === "_ping") {
         this.outputChannel.appendLine("Received ping from Neovim, sending pong response");
-        // 如果有请求ID，发送响应
+        // If there's a request ID, send response
         if (payload.requestId) {
           this.sendCommandResponse(payload.requestId, "pong", false);
         }
         return;
       }
 
-      // 检查是否有特殊命令
+      // Check for special commands
       if (payload.command === "eval" && Array.isArray(payload.args) && payload.args.length > 0) {
         await this.handleEvalCommand(payload);
         return;
@@ -322,20 +319,20 @@ export class WebSocketHandler {
         `${payload.callbackId ? `(callback_id: ${payload.callbackId})` : ''}`
       );
 
-      // 确保 args 是数组，并将其传递给 executeCommand
+      // Ensure args is an array and pass it to executeCommand
       const args = Array.isArray(payload.args) ? payload.args : [];
 
-      // 执行命令并获取结果
+      // Execute command and get result
       const result = await vscode.commands.executeCommand(payload.command, ...args);
 
       this.outputChannel.appendLine(`Command ${payload.command} executed successfully.`);
 
-      // 如果有请求ID，发送响应
+      // If there's a request ID, send response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, result, false);
       }
 
-      // 如果有回调ID，发送回调结果
+      // If there's a callback ID, send callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, result, false);
       }
@@ -345,12 +342,12 @@ export class WebSocketHandler {
         `Error executing command ${payload.command}: ${errorMessage}`,
       );
 
-      // 如果有请求ID，发送错误响应
+      // If there's a request ID, send error response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, errorMessage, true);
       }
 
-      // 如果有回调ID，发送错误回调结果
+      // If there's a callback ID, send error callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, errorMessage, true);
       } else {
@@ -361,7 +358,7 @@ export class WebSocketHandler {
     }
   }
 
-  // 处理eval命令
+  // Handle eval command
   private async handleEvalCommand(payload: ExecuteCommandPayload): Promise<void> {
     try {
       if (!Array.isArray(payload.args) || payload.args.length === 0) {
@@ -373,21 +370,21 @@ export class WebSocketHandler {
 
       this.outputChannel.appendLine(`Evaluating JavaScript code: ${code.substring(0, 100)}${code.length > 100 ? '...' : ''}`);
 
-      // 创建一个异步函数来执行代码
+      // Create an async function to execute code
       const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
       const fn = new AsyncFunction('vscode', 'args', 'logger', code);
 
-      // 执行代码
+      // Execute code
       const result = await fn(vscode, args, this.outputChannel);
 
       this.outputChannel.appendLine(`JavaScript evaluation completed successfully.`);
 
-      // 如果有请求ID，发送响应
+      // If there's a request ID, send response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, result, false);
       }
 
-      // 如果有回调ID，发送回调结果
+      // If there's a callback ID, send callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, result, false);
       }
@@ -395,12 +392,12 @@ export class WebSocketHandler {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.outputChannel.appendLine(`Error evaluating JavaScript: ${errorMessage}`);
 
-      // 如果有请求ID，发送错误响应
+      // If there's a request ID, send error response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, errorMessage, true);
       }
 
-      // 如果有回调ID，发送错误回调结果
+      // If there's a callback ID, send error callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, errorMessage, true);
       } else {
@@ -409,7 +406,7 @@ export class WebSocketHandler {
     }
   }
 
-  // 发送命令响应
+  // Send command response
   private sendCommandResponse(requestId: string, result: any, isError: boolean): void {
     const message: VicodeMessage = {
       sender: "vscode",
@@ -428,7 +425,7 @@ export class WebSocketHandler {
     this.sendMessage(message);
   }
 
-  // 发送回调结果
+  // Send callback result
   private sendCallbackResult(callbackId: string, result: any, isError: boolean): void {
     const message: VicodeMessage = {
       sender: "vscode",
@@ -447,20 +444,20 @@ export class WebSocketHandler {
     this.sendMessage(message);
   }
 
-  // 处理关闭buffer消息的方法
+  // Handle close buffer message
   private async handleCloseBuffer(payload: CloseBufferPayload): Promise<void> {
     try {
       this.outputChannel.appendLine(`Received request to close tab for file: ${payload.path}`);
 
-      // 查找匹配路径的文档
+      // Find documents matching the path
       const documents = vscode.workspace.textDocuments.filter(
         doc => doc.uri.fsPath === payload.path
       );
 
       if (documents.length > 0) {
-        // 找到匹配的文档，关闭它
+        // Found matching document, close it
         for (const doc of documents) {
-          // 使用内置命令关闭编辑器
+          // Use built-in command to close editor
           await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
           this.outputChannel.appendLine(`Successfully closed tab for file: ${payload.path}`);
         }
@@ -474,12 +471,28 @@ export class WebSocketHandler {
     }
   }
 
+  // Helper method to get socket state as string
+  private getSocketStateString(state: number): string {
+    switch (state) {
+      case WebSocket.CONNECTING:
+        return "CONNECTING";
+      case WebSocket.OPEN:
+        return "OPEN";
+      case WebSocket.CLOSING:
+        return "CLOSING";
+      case WebSocket.CLOSED:
+        return "CLOSED";
+      default:
+        return `UNKNOWN (${state})`;
+    }
+  }
+
   public sendMessage(message: VicodeMessage): void {
-    // 如果连接尚未就绪，将消息存储到待发送队列中
+    // If connection not ready, store message in pending queue
     if (!this.connectionReady) {
-      // 只存储光标位置和选择位置消息，其他消息（如命令执行）直接丢弃
+      // Only store cursor position and selection position messages, discard others (like command execution)
       if (message.payload.case === "cursorPos" || message.payload.case === "selectionPos") {
-        // 限制队列大小，避免内存泄漏
+        // Limit queue size to avoid memory leaks
         if (this.pendingMessages.length < 50) {
           this.pendingMessages.push(message);
           this.outputChannel.appendLine(`Message queued (connection not ready): ${message.payload.case}`);
@@ -490,37 +503,37 @@ export class WebSocketHandler {
       return;
     }
 
-    // 连接就绪但socket不存在，这是一个异常情况
+    // Connection ready but socket doesn't exist, this is an exceptional condition
     if (!this.socket) {
       this.outputChannel.appendLine("Cannot send message: socket is null but connection is marked as ready");
-      this.connectionReady = false; // 重置连接状态
+      this.connectionReady = false; // Reset connection state
       return;
     }
 
-    // 连接就绪但socket未打开，这可能是连接断开或正在关闭
+    // Connection ready but socket not open, this could be connection dropped or closing
     if (this.socket.readyState !== WebSocket.OPEN) {
       this.outputChannel.appendLine(`Cannot send message: socket not in OPEN state (${this.getSocketStateString(this.socket.readyState)})`);
 
-      // 如果是CONNECTING状态，可能是连接正在建立中，不做特殊处理
+      // If it's CONNECTING state, it might be connection establishing, don't do special handling
       if (this.socket.readyState !== WebSocket.CONNECTING) {
-        this.connectionReady = false; // 重置连接状态
+        this.connectionReady = false; // Reset connection state
       }
       return;
     }
 
-    // 连接就绪且socket打开，发送消息
+    // Connection ready and socket open, send message
     try {
       this.socket.send(JSON.stringify(message));
     } catch (error) {
       this.outputChannel.appendLine(`Error sending message: ${error}`);
-      this.connectionReady = false; // 发送失败，重置连接状态
+      this.connectionReady = false; // Send failed, reset connection state
     }
   }
 
   public close(): void {
     this.socket?.close();
     this.socket = null;
-    this.connectionReady = false; // 重置连接状态
-    this.pendingMessages = []; // 清空待处理消息
+    this.connectionReady = false; // Reset connection state
+    this.pendingMessages = []; // Clear pending message queue
   }
 }

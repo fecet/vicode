@@ -1,5 +1,21 @@
 import * as vscode from "vscode";
 
+// Shared state
+export let lastCursorPosition: {
+  path: string;
+  line: number;
+  col: number;
+} | null = null;
+
+export function updateLastCursorPosition(
+  path: string,
+  line: number,
+  col: number,
+): void {
+  lastCursorPosition = { path, line, col };
+}
+
+// Editor utilities
 export function isFocused(): boolean {
   return vscode.window.state.focused;
 }
