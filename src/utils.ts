@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { generateRandomString } from "../../shared/utils"; // Import from shared
 
 // Shared state
 export let lastCursorPosition: {
@@ -18,13 +19,6 @@ export function updateLastCursorPosition(
 // Editor utilities
 export function isFocused(): boolean {
   return vscode.window.state.focused;
-}
-
-export function generateRandomString(): string {
-  return (
-    Math.random().toString(36).substring(2, 15) +
-    Math.random().toString(36).substring(2, 15)
-  );
 }
 
 export function setCursorPosition(vimLine: number, vimCol: number): void {
@@ -74,12 +68,4 @@ export function getCursorPosition(): {
     line: position.line + 1,
     col: position.character + 1,
   };
-}
-
-export function getFilePath(): string {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    return "";
-  }
-  return editor.document.uri.fsPath;
 }

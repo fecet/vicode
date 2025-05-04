@@ -8,9 +8,6 @@ export const ensureObject = (arg: unknown): Record<string, unknown> => ensure(ar
 export const getCurrentLine = async (denops: Denops): Promise<number> =>
   ensureNumber(await denops.call("line", "."));
 
-export const getCurrentPath = async (denops: Denops): Promise<string> =>
-  ensureString(await denops.call("expand", "%:p"));
-
 export const getLastLine = async (denops: Denops): Promise<number> =>
   ensureNumber(await denops.call("line", "$"));
 
