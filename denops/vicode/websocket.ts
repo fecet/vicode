@@ -20,11 +20,9 @@ interface CommandRequest {
 import {
   getCurrentCol,
   getCurrentLine,
-  getCurrentPath,
   getLastLine,
   getSpecificLineLength,
 } from "./utils.ts";
-
 
 // Declare Deno namespace for TypeScript compiler
 declare namespace Deno {
@@ -187,7 +185,7 @@ export class WebSocketManager {
     };
     const currentLine = await getCurrentLine(denops);
     const currentCol = await getCurrentCol(denops);
-    const currentPath = await getCurrentPath(denops);
+    const currentPath = await denops.call("expand", "%:p") as string;
     const lastLine = await getLastLine(denops);
     const lastColOfNewLine = await getSpecificLineLength(
       denops,

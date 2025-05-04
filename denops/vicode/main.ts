@@ -7,25 +7,20 @@ import {
   ensureString,
   getCurrentCol,
   getCurrentLine,
-  getCurrentPath,
+  // getCurrentPath, // Removed
 } from "./utils.ts";
-// Import protobuf generated types
-import type {
-  VicodeMessage,
-  CursorPosPayload,
-  SelectionPosPayload,
-  ExecuteCommandPayload,
-  CloseBufferPayload,
-} from "../gen/vicode_pb.ts";
+import { DenoAdapter } from "./deno_adapter.ts"; // Import the adapter
 
 const wsManager = new WebSocketManager();
 
 export function main(denops: Denops): Promise<void> {
+  const adapter = new DenoAdapter(denops); // Create adapter instance
+
   const debouncedSyncCursor = debounce(
     async (line: unknown, col: unknown) => {
       const lineNum = ensureNumber(line);
       const colNum = ensureNumber(col);
-      const path = ensureString(await denops.call("expand", "%:p"));
+      const path = await adapter.getCurrentPath(); // Use adapter
 
       // Create cursor position message
       const message: VicodeMessage = {
@@ -48,7 +43,7 @@ export function main(denops: Denops): Promise<void> {
     syncCursorPos: async () => {
       const lineNum = await getCurrentLine(denops);
       const colNum = await getCurrentCol(denops);
-      const currentPath = await getCurrentPath(denops);
+      const currentPath = await adapter.getCurrentPath(); // Use adapter
       const lastCursorPos = wsManager.getLastCursorPos();
 
       if (
@@ -80,7 +75,7 @@ export function main(denops: Denops): Promise<void> {
         payload: {
           case: "selectionPos",
           value: {
-            path: await getCurrentPath(denops),
+            path: await adapter.getCurrentPath(), // Use adapter
             startLine: ensureNumber(startLine),
             startCol: ensureNumber(startCol),
             endLine: ensureNumber(endLine),

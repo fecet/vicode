@@ -13,9 +13,11 @@ import {
   lastCursorPosition,
   updateLastCursorPosition,
 } from "./utils";
+import { VSCodeAdapter } from "./vscode_adapter"; // Import the adapter
 
 let wsHandler: WebSocketHandler;
 let outputChannel: vscode.OutputChannel;
+let adapter: VSCodeAdapter; // Declare adapter variable
 
 // Create debounced version of cursor position sender
 const debouncedSendCursorPos = debounce(
@@ -60,6 +62,7 @@ const debouncedSendCursorPos = debounce(
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("vicode");
   wsHandler = new WebSocketHandler(outputChannel);
+  adapter = new VSCodeAdapter(); // Instantiate the adapter
 
   const connCmd = vscode.commands.registerCommand("vicode.connect", () =>
     wsHandler.connect(),

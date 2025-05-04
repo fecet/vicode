@@ -23,6 +23,7 @@
 	],
 	"include": [
 		"src/**/*",
-		"gen/**/*"
+		"gen/**/*",
+		"shared/**/*" // Add shared directory
 	]
 }
