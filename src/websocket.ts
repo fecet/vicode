@@ -6,7 +6,7 @@ import type {
   SelectionPosPayload,
   ExecuteCommandPayload,
   CloseBufferPayload
-} from "../gen/vicode_pb";
+} from "../shared/vicode_pb";
 import {
   setCursorPosition,
   selectRange,

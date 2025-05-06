@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { WebSocketHandler } from "./websocket";
-import type { VicodeMessage } from "../gen/vicode_pb";
+import type { VicodeMessage } from "../shared/vicode_pb";
 import { getCursorPosition, isFocused } from "./utils";
 import debounce from "debounce";
 import {

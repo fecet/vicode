@@ -11,3 +11,4 @@ pixi-pnpm
 gen
 denops/gen
 refactor.md
+**/*_pb.*

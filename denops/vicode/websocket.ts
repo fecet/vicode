@@ -6,7 +6,7 @@ import type {
   SelectionPosPayload,
   ExecuteCommandPayload,
   CloseBufferPayload,
-} from "../../denops/gen/vicode_pb.ts";
+} from "../../shared/vicode_pb.ts";
 
 // Define sync request/response type
 interface CommandRequest {

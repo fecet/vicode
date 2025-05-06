@@ -3,7 +3,7 @@ import { debounce } from "https://deno.land/std@0.224.0/async/mod.ts";
 import { runWsServer, stopWsServer, WebSocketManager } from "./websocket.ts";
 import { ensureNumber, ensureObject, ensureString } from "./utils.ts";
 import { DenoAdapter } from "./deno_adapter.ts";
-import type { VicodeMessage } from "../../denops/gen/vicode_pb.ts";
+import type { VicodeMessage } from "../../shared/vicode_pb.ts";
 
 const wsManager = new WebSocketManager();
 
