@@ -32,7 +32,7 @@
   },
   "scripts": {
     "vscode:prepublish": "pnpm run bundle",
-    "compile": "tsc -p ./ --noEmit",
+    "compile": "pnpm run bundle",
     "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
     "bundle": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --minify",
     "package": "pnpm run bundle && vsce package --no-dependencies -o vicode.vsix",
@@ -44,6 +44,7 @@
     "buf:generate": "buf generate"
   },
   "devDependencies": {
+    "@bufbuild/protoc-gen-es": "^2.2.5",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.90.0",
@@ -52,13 +53,13 @@
     "@typescript-eslint/parser": "^8.19.1",
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.4.1",
+    "@vscode/vsce": "^3.3.2",
     "esbuild": "^0.23.1",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.2.1",
     "prettier": "^3.4.2",
-    "typescript": "^5.7.2",
-    "vsce": "^2.15.0"
+    "typescript": "^5.7.2"
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.2.5",
