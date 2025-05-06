@@ -1,12 +1,5 @@
 import * as vscode from "vscode";
 import { WebSocket, MessageEvent } from "ws";
-import type {
-  VicodeMessage,
-  CursorPosPayload,
-  SelectionPosPayload,
-  ExecuteCommandPayload,
-  CloseBufferPayload
-} from "../shared/vicode_pb";
 import {
   setCursorPosition,
   selectRange,
@@ -14,6 +7,18 @@ import {
   lastCursorPosition,
   updateLastCursorPosition,
 } from "./utils";
+import {
+  VicodeMessage,
+  CursorPosPayload,
+  SelectionPosPayload,
+  ExecuteCommandPayload,
+  CloseBufferPayload,
+  createExecuteCommandMessage,
+  isExecuteCommandMessage,
+  isCursorPosMessage,
+  isSelectionPosMessage,
+  isCloseBufferMessage
+} from "../shared/messages";
 
 export class WebSocketHandler {
   private socket: WebSocket | null = null;
@@ -225,17 +230,17 @@ export class WebSocketHandler {
 
     const editor = vscode.window.activeTextEditor;
 
-    // Check which payload type is set
-    if (message.payload.case === "cursorPos" && message.payload.value && editor) {
+    // Use type guards to check message type
+    if (isCursorPosMessage(message) && editor) {
       await this.handleCursorPos(message.sender, message.payload.value, editor);
     }
-    else if (message.payload.case === "selectionPos" && message.payload.value && editor) {
+    else if (isSelectionPosMessage(message) && editor) {
       await this.handleSelectionPos(message.payload.value, editor);
     }
-    else if (message.payload.case === "executeCommand" && message.payload.value) {
+    else if (isExecuteCommandMessage(message)) {
       await this.handleExecuteCommand(message.payload.value);
     }
-    else if (message.payload.case === "closeBuffer" && message.payload.value) {
+    else if (isCloseBufferMessage(message)) {
       await this.handleCloseBuffer(message.payload.value);
     }
   }
@@ -408,38 +413,30 @@ export class WebSocketHandler {
 
   // Send command response
   private sendCommandResponse(requestId: string, result: any, isError: boolean): void {
-    const message: VicodeMessage = {
-      sender: "vscode",
-      payload: {
-        case: "executeCommand",
-        value: {
-          command: "_response",
-          args: [],
-          requestId: requestId,
-          result: result,
-          isError: isError
-        }
-      }
-    };
+    const message = createExecuteCommandMessage(
+      "vscode",
+      "_response",
+      [],
+      requestId,
+      "",
+      isError,
+      result
+    );
 
     this.sendMessage(message);
   }
 
   // Send callback result
   private sendCallbackResult(callbackId: string, result: any, isError: boolean): void {
-    const message: VicodeMessage = {
-      sender: "vscode",
-      payload: {
-        case: "executeCommand",
-        value: {
-          command: "_callback",
-          args: [],
-          callbackId: callbackId,
-          result: result,
-          isError: isError
-        }
-      }
-    };
+    const message = createExecuteCommandMessage(
+      "vscode",
+      "_callback",
+      [],
+      "",
+      callbackId,
+      isError,
+      result
+    );
 
     this.sendMessage(message);
   }

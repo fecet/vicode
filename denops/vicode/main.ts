@@ -3,7 +3,12 @@ import { debounce } from "https://deno.land/std@0.224.0/async/mod.ts";
 import { runWsServer, stopWsServer, WebSocketManager } from "./websocket.ts";
 import { ensureNumber, ensureObject, ensureString } from "./utils.ts";
 import { DenoAdapter } from "./deno_adapter.ts";
-import type { VicodeMessage } from "../../shared/vicode_pb.ts";
+import {
+  createCursorPosMessage,
+  createSelectionPosMessage,
+  createExecuteCommandMessage,
+  createCloseBufferMessage
+} from "../../shared/messages/index.ts";
 
 const wsManager = new WebSocketManager();
 
@@ -16,18 +21,13 @@ export function main(denops: Denops): Promise<void> {
       const colNum = ensureNumber(col);
       const path = await adapter.getCurrentPath(); // Use adapter
 
-      // Create cursor position message
-      const message: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "cursorPos",
-          value: {
-            path,
-            line: lineNum,
-            col: colNum,
-          }
-        }
-      };
+      // Create cursor position message using factory function
+      const message = createCursorPosMessage(
+        "vim",
+        path,
+        lineNum,
+        colNum
+      );
       wsManager.broadcast(message);
     },
     50, // Debounce time in ms
@@ -63,20 +63,15 @@ export function main(denops: Denops): Promise<void> {
       endLine: unknown,
       endCol: unknown,
     ): Promise<void> {
-      // Create selection position message
-      const message: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "selectionPos",
-          value: {
-            path: await adapter.getCurrentPath(), // Use adapter
-            startLine: ensureNumber(startLine),
-            startCol: ensureNumber(startCol),
-            endLine: ensureNumber(endLine),
-            endCol: ensureNumber(endCol),
-          }
-        }
-      };
+      // Create selection position message using factory function
+      const message = createSelectionPosMessage(
+        "vim",
+        await adapter.getCurrentPath(), // Use adapter
+        ensureNumber(startLine),
+        ensureNumber(startCol),
+        ensureNumber(endLine),
+        ensureNumber(endCol)
+      );
       wsManager.broadcast(message);
       return Promise.resolve();
     },
@@ -104,17 +99,12 @@ export function main(denops: Denops): Promise<void> {
         `Vicode: Sending command '${commandStr}' with args: ${JSON.stringify(commandArgs)}`,
       );
 
-      // Create command execution message
-      const message: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "executeCommand",
-          value: {
-            command: commandStr,
-            args: commandArgs,
-          }
-        }
-      };
+      // Create command execution message using factory function
+      const message = createExecuteCommandMessage(
+        "vim",
+        commandStr,
+        commandArgs
+      );
       wsManager.broadcast(message);
       return Promise.resolve();
     },
@@ -168,16 +158,11 @@ export function main(denops: Denops): Promise<void> {
       const filePath = ensureString(path);
       console.log(`Vicode: Sending close buffer message for path: ${filePath}`);
 
-      // Create close buffer message
-      const message: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "closeBuffer",
-          value: {
-            path: filePath,
-          }
-        }
-      };
+      // Create close buffer message using factory function
+      const message = createCloseBufferMessage(
+        "vim",
+        filePath
+      );
       wsManager.broadcast(message);
       return Promise.resolve();
     },
@@ -211,18 +196,14 @@ export function main(denops: Denops): Promise<void> {
         `Vicode: Sending async command '${commandStr}' with args: ${JSON.stringify(commandArgs)} and callback_id: ${callback_id}`,
       );
 
-      // Create command execution message with callback ID
-      const message: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "executeCommand",
-          value: {
-            command: commandStr,
-            args: commandArgs,
-            callbackId: callback_id ? String(callback_id) : undefined,
-          }
-        }
-      };
+      // Create command execution message with callback ID using factory function
+      const message = createExecuteCommandMessage(
+        "vim",
+        commandStr,
+        commandArgs,
+        "",
+        callback_id ? String(callback_id) : ""
+      );
       wsManager.broadcast(message);
       return Promise.resolve();
     },

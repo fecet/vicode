@@ -1,12 +1,16 @@
 import { Denops } from "jsr:@denops/core@7.0.1/type";
-// Import generated protobuf types
-import type {
+import {
   VicodeMessage,
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,
   CloseBufferPayload,
-} from "../../shared/vicode_pb.ts";
+  createExecuteCommandMessage,
+  isExecuteCommandMessage,
+  isCursorPosMessage,
+  isSelectionPosMessage,
+  isCloseBufferMessage
+} from "../../shared/messages/index.ts";
 
 // Define sync request/response type
 interface CommandRequest {
@@ -117,18 +121,13 @@ export class WebSocketManager {
       // Generate unique request ID
       const requestId = crypto.randomUUID();
 
-      // Create command execution message with request ID
-      const message: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "executeCommand",
-          value: {
-            command,
-            args,
-            requestId: requestId,
-          }
-        }
-      };
+      // Create command execution message with request ID using factory function
+      const message = createExecuteCommandMessage(
+        "vim",
+        command,
+        args,
+        requestId
+      );
 
       // Set timeout handler
       const timer = setTimeout(() => {
@@ -275,16 +274,11 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
 
     // Send a ping message to ensure connection is working
     try {
-      const pingMessage: VicodeMessage = {
-        sender: "vim",
-        payload: {
-          case: "executeCommand",
-          value: {
-            command: "_ping",
-            args: [],
-          }
-        }
-      };
+      const pingMessage = createExecuteCommandMessage(
+        "vim",
+        "_ping",
+        []
+      );
       socket.send(JSON.stringify(pingMessage));
       console.log("Vicode: Sent ping message to VSCode");
     } catch (error) {
@@ -304,15 +298,14 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
 
       // Only process messages from vscode
       if (msg.sender === "vscode") {
-        if (msg.payload.case === "cursorPos" && msg.payload.value) {
+        if (isCursorPosMessage(msg)) {
           await wsManager.handleCursorPosMessage(denops, msg.payload.value);
         }
-
-        else if (msg.payload.case === "selectionPos") {
+        else if (isSelectionPosMessage(msg)) {
           // Vim currently doesn't handle SelectionPos from VSCode, but log it
           console.log("Vicode: Received SelectionPos (ignored)");
         }
-        else if (msg.payload.case === "executeCommand" && msg.payload.value) {
+        else if (isExecuteCommandMessage(msg)) {
           // Check if it's a command response
           if (msg.payload.value.requestId) {
             console.log(`Vicode: Received command response for request: ${msg.payload.value.requestId}`);
@@ -340,7 +333,7 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
             console.log(`Vicode: Received ExecuteCommand: ${msg.payload.value.command} (ignored)`);
           }
         }
-        else if (msg.payload.case === "closeBuffer" && msg.payload.value) {
+        else if (isCloseBufferMessage(msg)) {
           // Temporarily commented out code for handling CloseBuffer requests from VSCode
           console.log(`Vicode: Received CloseBuffer request for path: ${msg.payload.value.path} (ignored)`);
           // Code below is commented out because we only need one-way sync from Neovim to VSCode for now

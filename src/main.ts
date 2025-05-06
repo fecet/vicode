@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { WebSocketHandler } from "./websocket";
-import type { VicodeMessage } from "../shared/vicode_pb";
 import { getCursorPosition, isFocused } from "./utils";
 import debounce from "debounce";
 import {
@@ -8,6 +7,7 @@ import {
   updateLastCursorPosition,
 } from "./utils";
 import { VSCodeAdapter } from "./vscode_adapter";
+import { createCursorPosMessage, createSelectionPosMessage } from "../shared/messages";
 
 let wsHandler: WebSocketHandler;
 let outputChannel: vscode.OutputChannel;
@@ -36,18 +36,13 @@ const debouncedSendCursorPos = debounce(
       cursorPosition.col,
     );
 
-    // Create message conforming to protobuf type
-    const message: VicodeMessage = {
-      sender: "vscode",
-      payload: {
-        case: "cursorPos",
-        value: {
-          path: document.uri.fsPath,
-          line: cursorPosition.line,
-          col: cursorPosition.col,
-        }
-      }
-    };
+    // Create cursor position message using factory function
+    const message = createCursorPosMessage(
+      "vscode",
+      document.uri.fsPath,
+      cursorPosition.line,
+      cursorPosition.col
+    );
     wsHandler.sendMessage(message);
   },
   50, // Debounce time unchanged
@@ -93,20 +88,15 @@ export function activate(context: vscode.ExtensionContext) {
       const cursorPosition = getCursorPosition();
       debouncedSendCursorPos(document, cursorPosition);
     } else {
-      // Create selection position message
-      const message: VicodeMessage = {
-        sender: "vscode",
-        payload: {
-          case: "selectionPos",
-          value: {
-            path: document.uri.fsPath,
-            startCol: selection.start.character,
-            startLine: selection.start.line,
-            endCol: selection.end.character,
-            endLine: selection.end.line,
-          }
-        }
-      };
+      // Create selection position message using factory function
+      const message = createSelectionPosMessage(
+        "vscode",
+        document.uri.fsPath,
+        selection.start.line,
+        selection.start.character,
+        selection.end.line,
+        selection.end.character
+      );
 
       wsHandler.sendMessage(message);
     }
