@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { generateRandomString } from "../../shared/utils"; // Import from shared
-import type { CursorPosPayload } from "../shared/vicode_pb";
+import { generateRandomString } from "../shared/utils"; // Import from shared
+import type { CursorPosPayload } from "../shared/messages";
 
 // Shared state
 export let lastCursorPosition: CursorPosPayload | null = null;
