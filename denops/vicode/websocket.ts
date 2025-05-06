@@ -1,12 +1,12 @@
 import { Denops } from "jsr:@denops/core@7.0.1/type";
-// Import protobuf generated types
+// Import generated protobuf types
 import type {
   VicodeMessage,
   CursorPosPayload,
   SelectionPosPayload,
   ExecuteCommandPayload,
   CloseBufferPayload,
-} from "../gen/vicode_pb.ts";
+} from "../../denops/gen/vicode_pb.ts";
 
 // Define sync request/response type
 interface CommandRequest {
