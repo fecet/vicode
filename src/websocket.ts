@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { WebSocket, MessageEvent } from "ws";
-import {
+import type {
   VicodeMessage,
   CursorPosPayload,
   SelectionPosPayload,

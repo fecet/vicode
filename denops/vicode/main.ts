@@ -1,15 +1,9 @@
 import { Denops } from "jsr:@denops/std";
 import { debounce } from "https://deno.land/std@0.224.0/async/mod.ts";
 import { runWsServer, stopWsServer, WebSocketManager } from "./websocket.ts";
-import {
-  ensureNumber,
-  ensureObject,
-  ensureString,
-  getCurrentCol,
-  getCurrentLine,
-  // getCurrentPath, // Removed
-} from "./utils.ts";
-import { DenoAdapter } from "./deno_adapter.ts"; // Import the adapter
+import { ensureNumber, ensureObject, ensureString } from "./utils.ts";
+import { DenoAdapter } from "./deno_adapter.ts";
+import type { VicodeMessage } from "../../denops/gen/vicode_pb.ts";
 
 const wsManager = new WebSocketManager();
 
@@ -41,9 +35,9 @@ export function main(denops: Denops): Promise<void> {
 
   denops.dispatcher = {
     syncCursorPos: async () => {
-      const lineNum = await getCurrentLine(denops);
-      const colNum = await getCurrentCol(denops);
-      const currentPath = await adapter.getCurrentPath(); // Use adapter
+      const lineNum = await adapter.getCurrentLine();
+      const colNum = await adapter.getCurrentCol();
+      const currentPath = await adapter.getCurrentPath();
       const lastCursorPos = wsManager.getLastCursorPos();
 
       if (

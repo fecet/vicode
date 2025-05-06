@@ -1,9 +1,13 @@
 import { Denops } from "jsr:@denops/std";
 import { ensure, is } from "jsr:@core/unknownutil";
 
+// Export utility functions for type safety
 export const ensureNumber = (arg: unknown): number => ensure(arg, is.Number);
 export const ensureString = (arg: unknown): string => ensure(arg, is.String);
 export const ensureObject = (arg: unknown): Record<string, unknown> => ensure(arg, is.Record);
+
+// Note: These functions are kept for backward compatibility
+// New code should use the DenoAdapter implementation instead
 
 export const getCurrentLine = async (denops: Denops): Promise<number> =>
   ensureNumber(await denops.call("line", "."));

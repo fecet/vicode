@@ -1,19 +1,13 @@
 import * as vscode from "vscode";
 import { WebSocketHandler } from "./websocket";
-import {
-  VicodeMessage,
-  CursorPosPayload,
-  SelectionPosPayload,
-  ExecuteCommandPayload,
-  CloseBufferPayload
-} from "../gen/vicode_pb";
+import type { VicodeMessage } from "../gen/vicode_pb";
 import { getCursorPosition, isFocused } from "./utils";
 import debounce from "debounce";
 import {
   lastCursorPosition,
   updateLastCursorPosition,
 } from "./utils";
-import { VSCodeAdapter } from "./vscode_adapter"; // Import the adapter
+import { VSCodeAdapter } from "./vscode_adapter";
 
 let wsHandler: WebSocketHandler;
 let outputChannel: vscode.OutputChannel;
