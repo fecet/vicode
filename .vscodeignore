@@ -15,3 +15,5 @@ vsc-extension-quickstart.md
 pixi*
 buf*
 .envrc
+build.mjs
+pnpm-lock.yaml
