@@ -17,7 +17,9 @@ import {
   isExecuteCommandMessage,
   isCursorPosMessage,
   isSelectionPosMessage,
-  isCloseBufferMessage
+  isCloseBufferMessage,
+  serializeMessage,
+  deserializeMessage
 } from "../shared/messages";
 
 export class WebSocketHandler {
@@ -128,14 +130,18 @@ export class WebSocketHandler {
           if (cursorPosMessages.length > 0) {
             const latestCursorPos = cursorPosMessages[cursorPosMessages.length - 1];
             this.outputChannel.appendLine(`Sending latest cursor position message (discarding ${cursorPosMessages.length - 1} older ones)`);
-            this.socket?.send(JSON.stringify(latestCursorPos));
+            // Serialize the message to binary format
+            const binaryData = serializeMessage(latestCursorPos);
+            this.socket?.send(binaryData);
           }
 
           // If there are selection position messages, only send the last one
           if (selectionPosMessages.length > 0) {
             const latestSelectionPos = selectionPosMessages[selectionPosMessages.length - 1];
             this.outputChannel.appendLine(`Sending latest selection position message (discarding ${selectionPosMessages.length - 1} older ones)`);
-            this.socket?.send(JSON.stringify(latestSelectionPos));
+            // Serialize the message to binary format
+            const binaryData = serializeMessage(latestSelectionPos);
+            this.socket?.send(binaryData);
           }
 
           // Clear pending message queue
@@ -225,23 +231,30 @@ export class WebSocketHandler {
   }
 
   private async handleMessage(ev: MessageEvent): Promise<void> {
-    const message = JSON.parse(ev.data.toString()) as VicodeMessage;
-    this.outputChannel.appendLine(`message ${JSON.stringify(message)}`);
+    try {
+      // Deserialize binary message instead of parsing JSON
+      const binaryData = new Uint8Array(ev.data as ArrayBuffer);
+      const message = deserializeMessage(binaryData);
 
-    const editor = vscode.window.activeTextEditor;
+      this.outputChannel.appendLine(`Received message type: ${message.payload.case}`);
 
-    // Use type guards to check message type
-    if (isCursorPosMessage(message) && editor) {
-      await this.handleCursorPos(message.sender, message.payload.value, editor);
-    }
-    else if (isSelectionPosMessage(message) && editor) {
-      await this.handleSelectionPos(message.payload.value, editor);
-    }
-    else if (isExecuteCommandMessage(message)) {
-      await this.handleExecuteCommand(message.payload.value);
-    }
-    else if (isCloseBufferMessage(message)) {
-      await this.handleCloseBuffer(message.payload.value);
+      const editor = vscode.window.activeTextEditor;
+
+      // Use type guards to check message type
+      if (isCursorPosMessage(message) && editor) {
+        await this.handleCursorPos(message.sender, message.payload.value, editor);
+      }
+      else if (isSelectionPosMessage(message) && editor) {
+        await this.handleSelectionPos(message.payload.value, editor);
+      }
+      else if (isExecuteCommandMessage(message)) {
+        await this.handleExecuteCommand(message.payload.value);
+      }
+      else if (isCloseBufferMessage(message)) {
+        await this.handleCloseBuffer(message.payload.value);
+      }
+    } catch (error) {
+      this.outputChannel.appendLine(`Error processing message: ${error}`);
     }
   }
 
@@ -520,7 +533,9 @@ export class WebSocketHandler {
 
     // Connection ready and socket open, send message
     try {
-      this.socket.send(JSON.stringify(message));
+      // Serialize the message to binary format
+      const binaryData = serializeMessage(message);
+      this.socket.send(binaryData);
     } catch (error) {
       this.outputChannel.appendLine(`Error sending message: ${error}`);
       this.connectionReady = false; // Send failed, reset connection state

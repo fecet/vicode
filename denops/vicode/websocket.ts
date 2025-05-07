@@ -9,7 +9,9 @@ import {
   isExecuteCommandMessage,
   isCursorPosMessage,
   isSelectionPosMessage,
-  isCloseBufferMessage
+  isCloseBufferMessage,
+  serializeMessage,
+  deserializeMessage
 } from "../../shared/messages/index.ts";
 
 // Define sync request/response type
@@ -82,12 +84,16 @@ export class WebSocketManager {
       return;
     }
 
+    // Serialize the message to binary format
+    const binaryData = serializeMessage(messageToSend);
+
     // Check status of each socket
     let activeSockets = 0;
     sockets.forEach((s) => {
       if (s.readyState === WebSocket.OPEN) {
         try {
-          s.send(JSON.stringify(messageToSend));
+          // Send binary data instead of JSON string
+          s.send(binaryData);
           activeSockets++;
         } catch (error) {
           console.error("Vicode: Error sending message:", error);
@@ -279,7 +285,9 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
         "_ping",
         []
       );
-      socket.send(JSON.stringify(pingMessage));
+      // Serialize the message to binary format
+      const binaryData = serializeMessage(pingMessage);
+      socket.send(binaryData);
       console.log("Vicode: Sent ping message to VSCode");
     } catch (error) {
       console.error("Vicode: Error sending ping message:", error);
@@ -294,7 +302,9 @@ function handleWs(denops: Denops, req: WebSocketRequest): WebSocketResponse {
   socket.onmessage = async (e: MessageEvent) => {
     // Parse message and handle known types
     try {
-      const msg = JSON.parse(e.data as string) as VicodeMessage;
+      // Deserialize binary message instead of parsing JSON
+      const binaryData = new Uint8Array(e.data as ArrayBuffer);
+      const msg = deserializeMessage(binaryData);
 
       // Only process messages from vscode
       if (msg.sender === "vscode") {
