@@ -5,14 +5,11 @@ plugins:
   - local: protoc-gen-es
     out: shared
     include_imports: true
-    opt: target=ts
-  # - local: protoc-gen-es
-  #   out: denops/gen
-  #   opt:
-  #     - target=ts
-  #     - import_extension=ts
-  #     # - rewrite_imports=@bufbuild/protobuf:npm:@bufbuild/protobuf
-  #     # - rewrite_imports=@bufbuild/protobuf/codegenv1:npm:@bufbuild/protobuf/codegenv1
+    opt:
+      - target=ts
+      - import_extension=ts
+      - rewrite_imports=@bufbuild/protobuf:npm:@bufbuild/protobuf
+      - rewrite_imports=@bufbuild/protobuf/codegenv1:npm:@bufbuild/protobuf/codegenv1
 
 inputs:
   - directory: proto

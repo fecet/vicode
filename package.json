@@ -34,7 +34,7 @@
     "vscode:prepublish": "pnpm run bundle",
     "compile": "pnpm run bundle",
     "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
-    "bundle": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --minify",
+    "bundle": "node build.mjs",
     "package": "pnpm run bundle && vsce package --no-dependencies -o vicode.vsix",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint -c eslint.config.mjs",

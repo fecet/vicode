@@ -15,12 +15,18 @@
 		// "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
 		// "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
 		// "noUnusedParameters": true,  /* Report errors on unused parameters. */
-	},
-	"exclude": [
-		"node_modules", // 通常建议排除 node_modules
-		"out",          // 排除编译输出目录
-		"denops"        // 排除 denops 目录
-	],
+    "baseUrl": ".",
+    "paths": {
+      "npm:@bufbuild/protobuf": [
+        "node_modules/@bufbuild/protobuf"
+      ]
+    }
+  },
+  "exclude": [
+    "node_modules",
+    "out",
+    "denops"
+  ],
 	"include": [
 		"src/**/*",
 		"gen/**/*",
