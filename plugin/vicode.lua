@@ -76,7 +76,9 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 
 	-- Wait a moment to ensure server is fully ready
 	print("Vicode: Waiting for server to be fully ready...")
-	vim.wait(500, function() return false end)
+	vim.wait(500, function()
+		return false
+	end)
 
 	-- Get git root directory of current file
 	local result = vim.fn.system(
@@ -103,7 +105,7 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 	-- Set environment variables to ensure VSCode auto-connects
 	local env = {
 		VICODE_ADDRESS = vicode.server.address,
-		VICODE_AUTOCONNECT = "1"  -- Ensure auto-connection
+		VICODE_AUTOCONNECT = "1", -- Ensure auto-connection
 	}
 
 	print("Vicode: Launching VSCode with connection address: " .. vicode.server.address)
@@ -116,7 +118,7 @@ vim.api.nvim_create_user_command("VicodeStart", function()
 			if data then
 				print("Vicode: VSCode launch error: " .. data, vim.log.levels.ERROR)
 			end
-		end
+		end,
 	})
 
 	vim.notify("Vicode: VSCode launched successfully", vim.log.levels.INFO)

@@ -35,7 +35,7 @@
     "compile": "pnpm run bundle",
     "watch": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
     "bundle": "node build.mjs",
-    "package": "pnpm run bundle && vsce package --no-dependencies -o vicode.vsix",
+    "package": "pnpm run bundle && vsce package --no-dependencies -o vicode.vsix  && rm -rf dist",
     "pretest": "pnpm run compile && pnpm run lint",
     "lint": "eslint -c eslint.config.mjs",
     "lint:fix": "eslint -c eslint.config.mjs --fix",
