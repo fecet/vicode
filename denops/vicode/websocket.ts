@@ -23,12 +23,7 @@ interface CommandRequest {
   reject: (reason: unknown) => void;
   timer: number | null;
 }
-import {
-  getCurrentCol,
-  getCurrentLine,
-  getLastLine,
-  getSpecificLineLength,
-} from "./utils.ts";
+import { DenoAdapter } from "./deno_adapter.ts"; // Added import
 
 // Declare Deno namespace for TypeScript compiler
 declare namespace Deno {
@@ -188,12 +183,12 @@ export class WebSocketManager {
       line: payload.line,
       col: payload.col
     };
-    const currentLine = await getCurrentLine(denops);
-    const currentCol = await getCurrentCol(denops);
+    const adapter = new DenoAdapter(denops); // Create DenoAdapter instance
+    const currentLine = await adapter.getCurrentLine(); // Use adapter method
+    const currentCol = await adapter.getCurrentCol(); // Use adapter method
     const currentPath = await denops.call("expand", "%:p") as string;
-    const lastLine = await getLastLine(denops);
-    const lastColOfNewLine = await getSpecificLineLength(
-      denops,
+    const lastLine = await adapter.getLastLine(); // Use adapter method
+    const lastColOfNewLine = await adapter.getSpecificLineLength( // Use adapter method
       newCursorPos.line,
     );
 

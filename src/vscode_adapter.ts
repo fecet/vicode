@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { EnvironmentAdapter } from "../shared/adapters/environment";
+import type { CursorPosPayload } from "../shared/vicode_pb"; // Corrected import path
 
 /**
  * VSCode environment adapter implementation
@@ -19,7 +20,9 @@ export class VSCodeAdapter implements EnvironmentAdapter {
    */
   getCurrentLine(): number {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return 1;
+    if (!editor) {
+      return 1;
+    }
     return editor.selection.active.line + 1; // Convert to 1-based
   }
 
@@ -28,7 +31,9 @@ export class VSCodeAdapter implements EnvironmentAdapter {
    */
   getCurrentCol(): number {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return 1;
+    if (!editor) {
+      return 1;
+    }
     return editor.selection.active.character + 1; // Convert to 1-based
   }
 
@@ -37,7 +42,9 @@ export class VSCodeAdapter implements EnvironmentAdapter {
    */
   getLastLine(): number {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return 1;
+    if (!editor) {
+      return 1;
+    }
     return editor.document.lineCount;
   }
 
@@ -46,7 +53,9 @@ export class VSCodeAdapter implements EnvironmentAdapter {
    */
   getSpecificLineLength(line: number): number {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return 0;
+    if (!editor) {
+      return 0;
+    }
 
     // Adjust for 0-based line numbers in VSCode
     const zeroBasedLine = line - 1;
@@ -64,7 +73,72 @@ export class VSCodeAdapter implements EnvironmentAdapter {
    */
   getCurrentText(): string {
     const editor = vscode.window.activeTextEditor;
-    if (!editor) return "";
+    if (!editor) {
+      return "";
+    }
     return editor.document.getText();
+  }
+
+  /**
+   * Check if the editor is focused
+   */
+  isEditorFocused(): boolean {
+    return vscode.window.state.focused;
+  }
+
+  /**
+   * Set the cursor position
+   */
+  setCursorPosition(vimLine: number, vimCol: number): void {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const newPosition = new vscode.Position(vimLine - 1, vimCol - 1);
+      const newSelection = new vscode.Selection(newPosition, newPosition);
+      editor.selection = newSelection;
+      editor.revealRange(newSelection);
+    }
+  }
+
+  /**
+   * Select a range of text
+   */
+  selectRange(
+    startLine: number,
+    startCharacter: number,
+    endLine: number,
+    endCharacter: number,
+  ): void {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+      return;
+    }
+    const startPosition = new vscode.Position(startLine, startCharacter);
+    const endPosition = new vscode.Position(endLine, endCharacter);
+    const selection = new vscode.Selection(startPosition, endPosition);
+    editor.selection = selection;
+    editor.revealRange(selection);
+  }
+
+  /**
+   * Get the cursor position payload
+   */
+  getCursorPosPayload(): CursorPosPayload {
+    const editor = vscode.window.activeTextEditor;
+    const filePath = editor ? editor.document.uri.fsPath : "";
+    if (!editor) {
+      return {
+        $typeName: "vicode.CursorPosPayload", // Add $typeName property
+        path: filePath,
+        line: 1,
+        col: 1,
+      };
+    }
+    const position = editor.selection.active;
+    return {
+      $typeName: "vicode.CursorPosPayload", // Add $typeName property
+      path: filePath,
+      line: position.line + 1, // 1-based
+      col: position.character + 1, // 1-based
+    };
   }
 }

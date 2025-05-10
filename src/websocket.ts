@@ -1,12 +1,10 @@
 import * as vscode from "vscode";
 import { WebSocket, MessageEvent } from "ws";
 import {
-  setCursorPosition,
-  selectRange,
-  isFocused,
-  lastCursorPosition,
-  updateLastCursorPosition,
+  lastCursorPosition, // Kept for use in handleCursorPos
+  updateLastCursorPosition, // Kept for use in handleCursorPos
 } from "./utils";
+import { VSCodeAdapter } from "./vscode_adapter"; // Added import
 import {
   VicodeMessage,
   CursorPosPayload,
@@ -27,9 +25,11 @@ export class WebSocketHandler {
   private outputChannel: vscode.OutputChannel;
   private connectionReady: boolean = false;
   private pendingMessages: VicodeMessage[] = [];
+  private adapter: VSCodeAdapter; // Added adapter property
 
   constructor(outputChannel: vscode.OutputChannel) {
     this.outputChannel = outputChannel;
+    this.adapter = new VSCodeAdapter(); // Instantiate adapter
   }
 
   /**
@@ -266,7 +266,8 @@ export class WebSocketHandler {
     this.outputChannel.appendLine(
       `${sender} ${payload.path} ${payload.line} ${payload.col}`,
     );
-    if (isFocused()) {
+    // if (isFocused()) { // Changed
+    if (this.adapter.isEditorFocused()) {
       return;
     }
     const document = await vscode.workspace.openTextDocument(payload.path);
@@ -295,7 +296,8 @@ export class WebSocketHandler {
 
     updateLastCursorPosition(payload.path, payload.line, payload.col); // Update last position
 
-    setCursorPosition(payload.line, payload.col);
+    // setCursorPosition(payload.line, payload.col); // Changed
+    this.adapter.setCursorPosition(payload.line, payload.col);
   }
 
   private async handleSelectionPos(
@@ -303,7 +305,8 @@ export class WebSocketHandler {
     editor: vscode.TextEditor,
   ): Promise<void> {
     if (payload.path === editor.document.uri.fsPath) {
-      selectRange(
+      // selectRange( // Changed
+      this.adapter.selectRange(
         payload.startLine - 1,
         payload.startCol - 1,
         payload.endLine - 1,

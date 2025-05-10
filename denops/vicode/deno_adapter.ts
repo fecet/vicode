@@ -1,17 +1,13 @@
 import { Denops } from "jsr:@denops/std";
-import { ensure, is } from "jsr:@core/unknownutil";
 import type { EnvironmentAdapter } from "../../shared/adapters/environment.ts";
-
-// Helper functions for type safety
-const ensureString = (arg: unknown): string => ensure(arg, is.String);
-const ensureNumber = (arg: unknown): number => ensure(arg, is.Number);
+import { ensureNumber, ensureObject, ensureString } from "./utils.ts";
 
 /**
  * Denops environment adapter implementation
  * Provides access to Neovim/Vim environment through Denops
  */
 export class DenoAdapter implements EnvironmentAdapter {
-  constructor(private denops: Denops) {}
+  constructor(private denops: Denops) { }
 
   /**
    * Get the current file path

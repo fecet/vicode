@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { WebSocketHandler } from "./websocket";
-import { getCursorPosition, isFocused } from "./utils";
 import debounce from "debounce";
 import {
   lastCursorPosition,
@@ -17,7 +16,8 @@ let adapter: VSCodeAdapter; // Declare adapter variable
 const debouncedSendCursorPos = debounce(
   (
     document: vscode.TextDocument,
-    cursorPosition: ReturnType<typeof getCursorPosition>,
+    // cursorPosition: ReturnType<typeof getCursorPosition>, // Changed
+    cursorPosition: ReturnType<VSCodeAdapter["getCursorPosPayload"]>,
   ) => {
     // Don't send if position hasn't changed
     if (
@@ -78,14 +78,16 @@ export function activate(context: vscode.ExtensionContext) {
     const selection = event.selections[0]; // Get the primary selection
     const isEmpty = selection.isEmpty;
     const isActive =
-      isFocused() && vscode.window.activeTextEditor === event.textEditor;
+      // isFocused() && vscode.window.activeTextEditor === event.textEditor; // Changed
+      adapter.isEditorFocused() && vscode.window.activeTextEditor === event.textEditor;
 
     if (!isActive) {
       return;
     }
 
     if (isEmpty) {
-      const cursorPosition = getCursorPosition();
+      // const cursorPosition = getCursorPosition(); // Changed
+      const cursorPosition = adapter.getCursorPosPayload();
       debouncedSendCursorPos(document, cursorPosition);
     } else {
       // Create selection position message using factory function
