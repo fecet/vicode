@@ -107,32 +107,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(connCmd, disconnCmd, legacyConnCmd, legacyDisconnCmd);
 
   // Check for auto-connect environment variables
-  const autoConnect = process.env.VICODE_AUTOCONNECT || process.env.SHAREEDIT_AUTOCONNECT;
-  const addressEnv = process.env.VICODE_ADDRESS || process.env.SHAREEDIT_ADDRESS;
+  const addressEnv = process.env.VICODE_ADDRESS;
 
   // Automatically connect on activation if:
-  // 1. VICODE_AUTOCONNECT is set to a truthy value, or
-  // 2. VICODE_ADDRESS environment variable is detected
-  // 3. Legacy SHAREEDIT_* variables are also supported for backward compatibility
-  if (
-    autoConnect === "1" ||
-    autoConnect === "true" ||
-    autoConnect === "yes" ||
-    addressEnv
-  ) {
-    if (addressEnv) {
-      if (process.env.VICODE_ADDRESS) {
-        outputChannel.appendLine("Auto-connecting due to VICODE_ADDRESS environment variable");
-      } else {
-        outputChannel.appendLine("Auto-connecting due to SHAREEDIT_ADDRESS environment variable (legacy)");
-      }
-    } else {
-      if (process.env.VICODE_AUTOCONNECT) {
-        outputChannel.appendLine("Auto-connecting due to VICODE_AUTOCONNECT environment variable");
-      } else {
-        outputChannel.appendLine("Auto-connecting due to SHAREEDIT_AUTOCONNECT environment variable (legacy)");
-      }
-    }
+  // VICODE_ADDRESS environment variable is detected
+  if (addressEnv) {
+    outputChannel.appendLine("Auto-connecting due to VICODE_ADDRESS environment variable");
     vscode.commands.executeCommand("vicode.connect");
   }
 }
