@@ -254,7 +254,8 @@ export class WebSocketHandler {
         await this.handleCloseBuffer(message.payload.value);
       }
     } catch (error) {
-      this.outputChannel.appendLine(`Error processing message: ${error}`);
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.outputChannel.appendLine(`Error processing message: ${errorStack}`);
     }
   }
 
@@ -359,8 +360,9 @@ export class WebSocketHandler {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : String(error);
       this.outputChannel.appendLine(
-        `Error executing command ${payload.command}: ${errorMessage}`,
+        `Error executing command ${payload.command}: ${errorMessage}\nStacktrace: ${errorStack}`,
       );
 
       // If there's a request ID, send error response
@@ -411,7 +413,8 @@ export class WebSocketHandler {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.outputChannel.appendLine(`Error evaluating JavaScript: ${errorMessage}`);
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.outputChannel.appendLine(`Error evaluating JavaScript: ${errorMessage}\nStacktrace: ${errorStack}`);
 
       // If there's a request ID, send error response
       if (payload.requestId) {
@@ -479,7 +482,8 @@ export class WebSocketHandler {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.outputChannel.appendLine(`Error closing tab: ${errorMessage}`);
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.outputChannel.appendLine(`Error closing tab: ${errorMessage}\nStacktrace: ${errorStack}`);
       vscode.window.showErrorMessage(`Failed to close tab: ${errorMessage}`);
     }
   }
@@ -540,7 +544,8 @@ export class WebSocketHandler {
       const binaryData = serializeMessage(message);
       this.socket.send(binaryData);
     } catch (error) {
-      this.outputChannel.appendLine(`Error sending message: ${error}`);
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.outputChannel.appendLine(`Error sending message: ${errorStack}`);
       this.connectionReady = false; // Send failed, reset connection state
     }
   }
