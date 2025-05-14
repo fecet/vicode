@@ -139,4 +139,13 @@ vim.api.nvim_create_user_command("VicodeStop", function()
 	vicode.server.address = nil
 end, {})
 
+local exec_count = 0
+vim.api.nvim_create_user_command("VicodeExecuteCell", function()
+	if exec_count == 1 then
+		require("vicode").call("workbench.action.navigateRight")
+	end
+	require("vicode").call("jupyter.runcurrentcell")
+	exec_count = exec_count + 1
+end, {})
+
 print("Vicode Lua plugin loaded")
