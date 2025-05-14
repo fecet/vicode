@@ -26,10 +26,16 @@ export class WebSocketHandler {
   private connectionReady: boolean = false;
   private pendingMessages: VicodeMessage[] = [];
   private adapter: VSCodeAdapter; // Added adapter property
+  private primaryTextEditor: vscode.TextEditor | undefined;
+  private primaryViewColumn: vscode.ViewColumn | undefined;
 
-  constructor(outputChannel: vscode.OutputChannel) {
+  constructor(outputChannel: vscode.OutputChannel, adapter: VSCodeAdapter) {
     this.outputChannel = outputChannel;
-    this.adapter = new VSCodeAdapter(); // Instantiate adapter
+    this.adapter = adapter; // Use the passed adapter
+  }
+
+  public getPrimaryEditor(): vscode.TextEditor | undefined {
+    return this.primaryTextEditor;
   }
 
   /**
@@ -37,28 +43,24 @@ export class WebSocketHandler {
    * @returns {string | undefined} Server address in format "host:port" or undefined if not set
    */
   private getServerAddressFromEnv(): string | undefined {
-    // Check for VICODE_SERVER environment variable
     const serverAddress = process.env.VICODE_SERVER;
     if (serverAddress) {
       this.outputChannel.appendLine(`Found server address in environment VICODE_SERVER: ${serverAddress}`);
       return serverAddress;
     }
 
-    // Also check for VICODE_ADDRESS environment variable (alternative name)
     const addressEnv = process.env.VICODE_ADDRESS;
     if (addressEnv) {
       this.outputChannel.appendLine(`Found server address in environment VICODE_ADDRESS: ${addressEnv}`);
       return addressEnv;
     }
 
-    // For backward compatibility, check legacy environment variables
     const legacyServerAddress = process.env.SHAREEDIT_SERVER;
     if (legacyServerAddress) {
       this.outputChannel.appendLine(`Found server address in legacy environment SHAREEDIT_SERVER: ${legacyServerAddress}`);
       return legacyServerAddress;
     }
 
-    // Also check for legacy SHAREEDIT_ADDRESS environment variable
     const legacyAddressEnv = process.env.SHAREEDIT_ADDRESS;
     if (legacyAddressEnv) {
       this.outputChannel.appendLine(`Found server address in legacy environment SHAREEDIT_ADDRESS: ${legacyAddressEnv}`);
@@ -69,7 +71,6 @@ export class WebSocketHandler {
   }
 
   async connect(maxRetries = 5, retryInterval = 1000): Promise<void> {
-    // Check if server address is set in environment variable
     const serverAddress = this.getServerAddressFromEnv();
 
     if (!serverAddress) {
@@ -77,92 +78,75 @@ export class WebSocketHandler {
       return;
     }
 
-    // If server address is set in environment, use it directly
     if (this.socket) {
       this.disconnect();
     }
 
     this.outputChannel.appendLine(`Connecting to server from environment: ${serverAddress}`);
 
-    // Add retry logic
     let retryCount = 0;
     const connectWithRetry = () => {
       this.outputChannel.appendLine(`Connection attempt ${retryCount + 1}/${maxRetries + 1}`);
 
       this.socket = new WebSocket(`ws://${serverAddress}`);
 
-      // Set connection timeout
       const connectionTimeout = setTimeout(() => {
         if (this.socket && this.socket.readyState !== WebSocket.OPEN) {
           this.outputChannel.appendLine(`Connection attempt ${retryCount + 1} timed out`);
           this.socket.close();
           retryOrFail();
         }
-      }, 5000); // 5 second connection timeout
+      }, 5000);
 
-      // Set error handler
       this.socket.onerror = (error) => {
         clearTimeout(connectionTimeout);
         this.outputChannel.appendLine(`Connection error on attempt ${retryCount + 1}: ${error}`);
         retryOrFail();
       };
 
-      // Set connection success handler
       this.socket.onopen = () => {
         clearTimeout(connectionTimeout);
         this.outputChannel.appendLine(`Connected to server on attempt ${retryCount + 1}`);
         vscode.window.showInformationMessage(`Connected to WebSocket server`);
         this.setupSocketListeners();
 
-        // Set connection ready state
         this.connectionReady = true;
         this.outputChannel.appendLine("Connection marked as ready");
 
-        // Send all pending messages
         if (this.pendingMessages.length > 0) {
           this.outputChannel.appendLine(`Sending ${this.pendingMessages.length} queued messages`);
 
-          // Only send the latest cursor position message to avoid sending too many historical positions
           const cursorPosMessages = this.pendingMessages.filter(m => m.payload.case === "cursorPos");
           const selectionPosMessages = this.pendingMessages.filter(m => m.payload.case === "selectionPos");
 
-          // If there are cursor position messages, only send the last one
           if (cursorPosMessages.length > 0) {
             const latestCursorPos = cursorPosMessages[cursorPosMessages.length - 1];
             this.outputChannel.appendLine(`Sending latest cursor position message (discarding ${cursorPosMessages.length - 1} older ones)`);
-            // Serialize the message to binary format
             const binaryData = serializeMessage(latestCursorPos);
             this.socket?.send(binaryData);
           }
 
-          // If there are selection position messages, only send the last one
           if (selectionPosMessages.length > 0) {
             const latestSelectionPos = selectionPosMessages[selectionPosMessages.length - 1];
             this.outputChannel.appendLine(`Sending latest selection position message (discarding ${selectionPosMessages.length - 1} older ones)`);
-            // Serialize the message to binary format
             const binaryData = serializeMessage(latestSelectionPos);
             this.socket?.send(binaryData);
           }
 
-          // Clear pending message queue
           this.pendingMessages = [];
         }
       };
 
-      // Set close handler
       this.socket.onclose = (event) => {
         clearTimeout(connectionTimeout);
 
-        // Reset connection state
         this.connectionReady = false;
 
-        // Log detailed close information
         this.outputChannel.appendLine(`Connection closed on attempt ${retryCount + 1}:`);
         this.outputChannel.appendLine(`- Close code: ${event.code}`);
         this.outputChannel.appendLine(`- Close reason: ${event.reason || "No reason provided"}`);
         this.outputChannel.appendLine(`- Was clean: ${event.wasClean ? "Yes" : "No"}`);
 
-        // Provide diagnostic information based on close code
         if (event.code === 1000) {
           this.outputChannel.appendLine("- Diagnosis: Normal closure, connection successfully completed");
         } else if (event.code === 1001) {
@@ -173,14 +157,11 @@ export class WebSocketHandler {
           this.outputChannel.appendLine("- Diagnosis: Server error, server encountered an unexpected condition");
         }
 
-        // Only retry during initial connection phase, avoid retrying on normal closure
-        // If it's a normal close (1000) or server shutdown (1001), don't retry
         if (retryCount < maxRetries && !this.isConnected() && event.code !== 1000 && event.code !== 1001) {
           this.outputChannel.appendLine("- Action: Will retry connection");
           retryOrFail();
         } else {
           this.outputChannel.appendLine("- Action: Will not retry connection");
-          // If no more retries, clear pending message queue
           if (this.pendingMessages.length > 0) {
             this.outputChannel.appendLine(`- Discarding ${this.pendingMessages.length} queued messages`);
             this.pendingMessages = [];
@@ -189,7 +170,6 @@ export class WebSocketHandler {
       };
     };
 
-    // Retry or fail handler
     const retryOrFail = () => {
       if (retryCount < maxRetries) {
         retryCount++;
@@ -202,11 +182,9 @@ export class WebSocketHandler {
       }
     };
 
-    // Start first connection attempt
     connectWithRetry();
   }
 
-  // Check if connected
   private isConnected(): boolean {
     return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
   }
@@ -214,8 +192,8 @@ export class WebSocketHandler {
   public disconnect(): void {
     this.socket?.close();
     this.socket = null;
-    this.connectionReady = false; // Reset connection state
-    this.pendingMessages = []; // Clear pending messages
+    this.connectionReady = false;
+    this.pendingMessages = [];
     vscode.window.showInformationMessage(`Disconnected from WebSocket server`);
   }
 
@@ -224,7 +202,6 @@ export class WebSocketHandler {
       return;
     }
 
-    // Only add message handler, other event handlers are set in connect method
     this.socket.addEventListener("message", this.handleMessage.bind(this));
 
     this.outputChannel.appendLine("Socket listeners set up");
@@ -232,20 +209,22 @@ export class WebSocketHandler {
 
   private async handleMessage(ev: MessageEvent): Promise<void> {
     try {
-      // Deserialize binary message instead of parsing JSON
       const binaryData = new Uint8Array(ev.data as ArrayBuffer);
       const message = deserializeMessage(binaryData);
 
       this.outputChannel.appendLine(`Received message type: ${message.payload.case}`);
 
-      const editor = vscode.window.activeTextEditor;
-
-      // Use type guards to check message type
-      if (isCursorPosMessage(message) && editor) {
-        await this.handleCursorPos(message.sender, message.payload.value, editor);
+      if (isCursorPosMessage(message)) {
+        const editor = await this.ensureEditorForPath(message.payload.value.path);
+        if (editor) {
+          await this.handleCursorPos(message.sender, message.payload.value, editor);
+        }
       }
-      else if (isSelectionPosMessage(message) && editor) {
-        await this.handleSelectionPos(message.payload.value, editor);
+      else if (isSelectionPosMessage(message)) {
+        const editor = await this.ensureEditorForPath(message.payload.value.path);
+        if (editor) {
+          await this.handleSelectionPos(message.payload.value, editor);
+        }
       }
       else if (isExecuteCommandMessage(message)) {
         await this.handleExecuteCommand(message.payload.value);
@@ -267,12 +246,10 @@ export class WebSocketHandler {
     this.outputChannel.appendLine(
       `${sender} ${payload.path} ${payload.line} ${payload.col}`,
     );
-    // if (isFocused()) { // Changed
+
     if (this.adapter.isEditorFocused()) {
       return;
     }
-    const document = await vscode.workspace.openTextDocument(payload.path);
-    await vscode.window.showTextDocument(document);
 
     const newCursorPos = { line: payload.line, col: payload.col };
     let cursorPos: { line: number; col: number } = newCursorPos;
@@ -295,9 +272,8 @@ export class WebSocketHandler {
       return;
     }
 
-    updateLastCursorPosition(payload.path, payload.line, payload.col); // Update last position
+    updateLastCursorPosition(payload.path, payload.line, payload.col);
 
-    // setCursorPosition(payload.line, payload.col); // Changed
     this.adapter.setCursorPosition(payload.line, payload.col);
   }
 
@@ -306,7 +282,6 @@ export class WebSocketHandler {
     editor: vscode.TextEditor,
   ): Promise<void> {
     if (payload.path === editor.document.uri.fsPath) {
-      // selectRange( // Changed
       this.adapter.selectRange(
         payload.startLine - 1,
         payload.startCol - 1,
@@ -316,20 +291,16 @@ export class WebSocketHandler {
     }
   }
 
-  // Handle ExecuteCommand message
   private async handleExecuteCommand(payload: ExecuteCommandPayload): Promise<void> {
     try {
-      // Handle ping command
       if (payload.command === "_ping") {
         this.outputChannel.appendLine("Received ping from Neovim, sending pong response");
-        // If there's a request ID, send response
         if (payload.requestId) {
           this.sendCommandResponse(payload.requestId, "pong", false);
         }
         return;
       }
 
-      // Check for special commands
       if (payload.command === "eval" && Array.isArray(payload.args) && payload.args.length > 0) {
         await this.handleEvalCommand(payload);
         return;
@@ -341,20 +312,16 @@ export class WebSocketHandler {
         `${payload.callbackId ? `(callback_id: ${payload.callbackId})` : ''}`
       );
 
-      // Ensure args is an array and pass it to executeCommand
       const args = Array.isArray(payload.args) ? payload.args : [];
 
-      // Execute command and get result
       const result = await vscode.commands.executeCommand(payload.command, ...args);
 
       this.outputChannel.appendLine(`Command ${payload.command} executed successfully.`);
 
-      // If there's a request ID, send response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, result, false);
       }
 
-      // If there's a callback ID, send callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, result, false);
       }
@@ -365,12 +332,10 @@ export class WebSocketHandler {
         `Error executing command ${payload.command}: ${errorMessage}\nStacktrace: ${errorStack}`,
       );
 
-      // If there's a request ID, send error response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, errorMessage, true);
       }
 
-      // If there's a callback ID, send error callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, errorMessage, true);
       } else {
@@ -381,7 +346,6 @@ export class WebSocketHandler {
     }
   }
 
-  // Handle eval command
   private async handleEvalCommand(payload: ExecuteCommandPayload): Promise<void> {
     try {
       if (!Array.isArray(payload.args) || payload.args.length === 0) {
@@ -393,21 +357,17 @@ export class WebSocketHandler {
 
       this.outputChannel.appendLine(`Evaluating JavaScript code: ${code.substring(0, 100)}${code.length > 100 ? '...' : ''}`);
 
-      // Create an async function to execute code
       const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
       const fn = new AsyncFunction('vscode', 'args', 'logger', code);
 
-      // Execute code
       const result = await fn(vscode, args, this.outputChannel);
 
       this.outputChannel.appendLine(`JavaScript evaluation completed successfully.`);
 
-      // If there's a request ID, send response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, result, false);
       }
 
-      // If there's a callback ID, send callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, result, false);
       }
@@ -416,12 +376,10 @@ export class WebSocketHandler {
       const errorStack = error instanceof Error ? error.stack : String(error);
       this.outputChannel.appendLine(`Error evaluating JavaScript: ${errorMessage}\nStacktrace: ${errorStack}`);
 
-      // If there's a request ID, send error response
       if (payload.requestId) {
         this.sendCommandResponse(payload.requestId, errorMessage, true);
       }
 
-      // If there's a callback ID, send error callback result
       if (payload.callbackId) {
         this.sendCallbackResult(payload.callbackId, errorMessage, true);
       } else {
@@ -430,7 +388,6 @@ export class WebSocketHandler {
     }
   }
 
-  // Send command response
   private sendCommandResponse(requestId: string, result: any, isError: boolean): void {
     const message = createExecuteCommandMessage(
       "vscode",
@@ -445,7 +402,6 @@ export class WebSocketHandler {
     this.sendMessage(message);
   }
 
-  // Send callback result
   private sendCallbackResult(callbackId: string, result: any, isError: boolean): void {
     const message = createExecuteCommandMessage(
       "vscode",
@@ -460,22 +416,25 @@ export class WebSocketHandler {
     this.sendMessage(message);
   }
 
-  // Handle close buffer message
   private async handleCloseBuffer(payload: CloseBufferPayload): Promise<void> {
     try {
       this.outputChannel.appendLine(`Received request to close tab for file: ${payload.path}`);
 
-      // Find documents matching the path
-      const documents = vscode.workspace.textDocuments.filter(
-        doc => doc.uri.fsPath === payload.path
+      const editorsToClose = vscode.window.visibleTextEditors.filter(
+        editor => editor.document.uri.fsPath === payload.path
       );
 
-      if (documents.length > 0) {
-        // Found matching document, close it
-        for (const doc of documents) {
-          // Use built-in command to close editor
+      if (editorsToClose.length > 0) {
+        for (const editor of editorsToClose) {
+          if (this.primaryTextEditor === editor) {
+            this.primaryTextEditor = undefined;
+            this.primaryViewColumn = undefined;
+            this.adapter.setPrimaryEditor(undefined);
+            this.outputChannel.appendLine(`Primary editor for ${payload.path} is being closed.`);
+          }
+          await vscode.window.showTextDocument(editor.document, { viewColumn: editor.viewColumn, preserveFocus: false });
           await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-          this.outputChannel.appendLine(`Successfully closed tab for file: ${payload.path}`);
+          this.outputChannel.appendLine(`Successfully closed tab for file: ${payload.path} in view column ${editor.viewColumn}`);
         }
       } else {
         this.outputChannel.appendLine(`No open tab found for file: ${payload.path}`);
@@ -488,7 +447,6 @@ export class WebSocketHandler {
     }
   }
 
-  // Helper method to get socket state as string
   private getSocketStateString(state: number): string {
     switch (state) {
       case WebSocket.CONNECTING:
@@ -505,11 +463,8 @@ export class WebSocketHandler {
   }
 
   public sendMessage(message: VicodeMessage): void {
-    // If connection not ready, store message in pending queue
     if (!this.connectionReady) {
-      // Only store cursor position and selection position messages, discard others (like command execution)
       if (message.payload.case === "cursorPos" || message.payload.case === "selectionPos") {
-        // Limit queue size to avoid memory leaks
         if (this.pendingMessages.length < 50) {
           this.pendingMessages.push(message);
           this.outputChannel.appendLine(`Message queued (connection not ready): ${message.payload.case}`);
@@ -520,40 +475,85 @@ export class WebSocketHandler {
       return;
     }
 
-    // Connection ready but socket doesn't exist, this is an exceptional condition
     if (!this.socket) {
       this.outputChannel.appendLine("Cannot send message: socket is null but connection is marked as ready");
-      this.connectionReady = false; // Reset connection state
+      this.connectionReady = false;
       return;
     }
 
-    // Connection ready but socket not open, this could be connection dropped or closing
     if (this.socket.readyState !== WebSocket.OPEN) {
       this.outputChannel.appendLine(`Cannot send message: socket not in OPEN state (${this.getSocketStateString(this.socket.readyState)})`);
 
-      // If it's CONNECTING state, it might be connection establishing, don't do special handling
       if (this.socket.readyState !== WebSocket.CONNECTING) {
-        this.connectionReady = false; // Reset connection state
+        this.connectionReady = false;
       }
       return;
     }
 
-    // Connection ready and socket open, send message
     try {
-      // Serialize the message to binary format
       const binaryData = serializeMessage(message);
       this.socket.send(binaryData);
     } catch (error) {
       const errorStack = error instanceof Error ? error.stack : String(error);
       this.outputChannel.appendLine(`Error sending message: ${errorStack}`);
-      this.connectionReady = false; // Send failed, reset connection state
+      this.connectionReady = false;
     }
   }
 
   public close(): void {
     this.socket?.close();
     this.socket = null;
-    this.connectionReady = false; // Reset connection state
-    this.pendingMessages = []; // Clear pending message queue
+    this.connectionReady = false;
+    this.pendingMessages = [];
+    this.primaryTextEditor = undefined;
+    this.primaryViewColumn = undefined;
+    this.adapter.setPrimaryEditor(undefined);
+  }
+
+  private async ensureEditorForPath(filePath: string): Promise<vscode.TextEditor | undefined> {
+    if (this.primaryTextEditor && this.primaryTextEditor.document.uri.fsPath === filePath) {
+      if (this.primaryViewColumn && this.primaryTextEditor.viewColumn !== this.primaryViewColumn) {
+        try {
+          await vscode.window.showTextDocument(this.primaryTextEditor.document, { viewColumn: this.primaryViewColumn, preserveFocus: false, preview: false });
+        } catch (e) {
+          this.outputChannel.appendLine(`Error trying to re-show primary editor in stored view column: ${e}`);
+        }
+      }
+      await vscode.window.showTextDocument(this.primaryTextEditor.document, { viewColumn: this.primaryTextEditor.viewColumn, preserveFocus: false, preview: false });
+      return this.primaryTextEditor;
+    }
+
+    for (const editor of vscode.window.visibleTextEditors) {
+      if (editor.document.uri.fsPath === filePath) {
+        this.outputChannel.appendLine(`Found existing editor for ${filePath} in view column ${editor.viewColumn}. Setting as primary.`);
+        this.primaryTextEditor = editor;
+        this.primaryViewColumn = editor.viewColumn;
+        this.adapter.setPrimaryEditor(this.primaryTextEditor);
+        await vscode.window.showTextDocument(editor.document, { viewColumn: editor.viewColumn, preserveFocus: false, preview: false });
+        return this.primaryTextEditor;
+      }
+    }
+
+    try {
+      const document = await vscode.workspace.openTextDocument(filePath);
+      const targetViewColumn = this.primaryViewColumn || vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
+      this.outputChannel.appendLine(`Opening ${filePath} in view column ${targetViewColumn}.`);
+      this.primaryTextEditor = await vscode.window.showTextDocument(document, {
+        viewColumn: targetViewColumn,
+        preserveFocus: false,
+        preview: false,
+      });
+      this.primaryViewColumn = this.primaryTextEditor.viewColumn;
+      this.adapter.setPrimaryEditor(this.primaryTextEditor);
+      return this.primaryTextEditor;
+    } catch (error) {
+      const errorStack = error instanceof Error ? error.stack : String(error);
+      this.outputChannel.appendLine(`Error opening document ${filePath}: ${errorStack}`);
+      vscode.window.showErrorMessage(`Error opening file ${filePath}: ${error instanceof Error ? error.message : error}`);
+      this.primaryTextEditor = undefined;
+      this.primaryViewColumn = undefined;
+      this.adapter.setPrimaryEditor(undefined);
+      return undefined;
+    }
   }
 }

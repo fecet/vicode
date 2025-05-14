@@ -16,7 +16,6 @@ let adapter: VSCodeAdapter; // Declare adapter variable
 const debouncedSendCursorPos = debounce(
   (
     document: vscode.TextDocument,
-    // cursorPosition: ReturnType<typeof getCursorPosition>, // Changed
     cursorPosition: ReturnType<VSCodeAdapter["getCursorPosPayload"]>,
   ) => {
     // Don't send if position hasn't changed
@@ -50,8 +49,8 @@ const debouncedSendCursorPos = debounce(
 
 export function activate(context: vscode.ExtensionContext) {
   outputChannel = vscode.window.createOutputChannel("vicode");
-  wsHandler = new WebSocketHandler(outputChannel);
-  adapter = new VSCodeAdapter(); // Instantiate the adapter
+  adapter = new VSCodeAdapter(); // Instantiate the adapter first
+  wsHandler = new WebSocketHandler(outputChannel, adapter); // Pass adapter to WebSocketHandler
 
   const connCmd = vscode.commands.registerCommand("vicode.connect", () =>
     wsHandler.connect(),
@@ -77,16 +76,16 @@ export function activate(context: vscode.ExtensionContext) {
     const document = event.textEditor.document;
     const selection = event.selections[0]; // Get the primary selection
     const isEmpty = selection.isEmpty;
-    const isActive =
-      // isFocused() && vscode.window.activeTextEditor === event.textEditor; // Changed
-      adapter.isEditorFocused() && vscode.window.activeTextEditor === event.textEditor;
+
+    // Check if the event's editor is the primary editor managed by WebSocketHandler
+    const primaryEditor = wsHandler.getPrimaryEditor();
+    const isActive = primaryEditor === event.textEditor && adapter.isEditorFocused();
 
     if (!isActive) {
       return;
     }
 
     if (isEmpty) {
-      // const cursorPosition = getCursorPosition(); // Changed
       const cursorPosition = adapter.getCursorPosPayload();
       debouncedSendCursorPos(document, cursorPosition);
     } else {
